@@ -2238,7 +2238,7 @@ footer.site-full{gap:32px}
     rfc: 'CMI210129QN2',
     domicilio: 'Privada de Horacio 22, Polanco, CDMX, C.P. 11500',
     correo: 'infominmx@gmail.com',          // CONFIRMAR: correo de atención de Min
-    whatsapp: '',                            // CONFIRMAR: 10 dígitos, ej. '2221234567'
+    whatsapp: '5619255395',                  // 10 dígitos, sin +52
     horario: 'lunes a viernes de 9:00 a 18:00 h',
     zonas: 'CDMX, área metropolitana y Puebla',
     fabricacion: 'aproximadamente 3 semanas',
@@ -2253,7 +2253,7 @@ footer.site-full{gap:32px}
     actualizado: '26 de septiembre de 2026'
   };
   const L = LEGAL;
-  const wa = () => L.whatsapp ? `WhatsApp ${L.whatsapp.replace(/(\d{2,3})(\d{3,4})(\d{4})$/, '$1 $2 $3')}` : 'WhatsApp [por confirmar]';
+  const wa = () => L.whatsapp ? `WhatsApp +52 ${L.whatsapp.replace(/(\d{2})(\d{4})(\d{4})$/, '$1 $2 $3')}` : 'WhatsApp [por confirmar]';
   const waHref = () => L.whatsapp ? `https://wa.me/52${L.whatsapp}` : '#';
   const contacto = () => `<a href="mailto:${L.correo}">${L.correo}</a> o ${wa()}, ${L.horario}`;
   const link = (doc, t) => `<a href="#/legal?doc=${doc}">${t}</a>`;
