@@ -1567,7 +1567,7 @@ footer.site-full{gap:32px}
             <h3>Ruta Min</h3>
             <div class="fl-price">$1,000</div>
             <p>Juntamos pedidos de tu zona y armamos ruta. Mismo servicio, un tercio del precio.</p>
-            <ul><li>${I.check}Te avisamos el día antes de salir</li><li>${I.check}Llega en máx. [7] días después de fabricado</li></ul>
+            <ul><li>${I.check}Te avisamos el día antes de salir</li><li>${I.check}Llega en máx. 7 días después de fabricado</li></ul>
           </article>
 
           <article class="fl-card gratis">
@@ -1616,7 +1616,7 @@ footer.site-full{gap:32px}
           <div class="fc-track"><i style="width:${pct}%"></i></div>
           <small>El chaise cuenta como 2 piezas.</small>
         </div>
-        ${opt('ruta', 'Juntamos pedidos de tu zona · máx. [7] días después de fabricado')}
+        ${opt('ruta', 'Juntamos pedidos de tu zona · máx. 7 días después de fabricado')}
         ${opt('ya', 'Camioneta solo para ti · el día que elijas')}
         <div class="fc-inc">${I.check}Incluye subida por elevador y armado. Sin gastos ocultos.</div>
       </div>`;
@@ -2261,7 +2261,7 @@ footer.site-full{gap:32px}
     const F = (window.MinFlete && MinFlete.FLETE) || {};
     const p = k => F[k] ? `$${F[k].price.toLocaleString('es-MX')}` : '';
     return `<li><b>Lo quiero YA</b> ${p('ya')} — camioneta exclusiva para tu pedido.</li>
-      <li><b>Ruta Min</b> ${p('ruta')} — tu pedido viaja en nuestra ruta programada por zona.</li>
+      <li><b>Ruta Min</b> ${p('ruta')} — tu pedido viaja en nuestra ruta programada por zona y llega en máximo 7 días después de fabricado.</li>
       <li><b>Flete gratis</b> desde 4 piezas en el mismo pedido (el Chaise cuenta como 2 piezas).</li>`;
   };
 
