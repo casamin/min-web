@@ -502,7 +502,7 @@ footer.site{position:relative}
 body.erp-on{background:#F2F3F5}
 body.erp-on #nav,body.erp-on #footer{display:none}
 .erp{display:grid;grid-template-columns:220px 1fr;min-height:100vh;font-size:14px}
-@media(max-width:860px){.erp{grid-template-columns:minmax(0,1fr)}.erp-side,.erp-main{min-width:0}}
+@media(max-width:860px){.erp{grid-template-columns:minmax(0,1fr);grid-template-rows:auto 1fr}.erp-side,.erp-main{min-width:0}}
 .erp-side{background:var(--ink);color:#fff;padding:22px 14px;display:flex;flex-direction:column;gap:22px;position:sticky;top:0;height:100vh}
 @media(max-width:860px){.erp-side{position:static;height:auto;flex-direction:row;flex-wrap:wrap;align-items:center;padding:12px;gap:10px}}
 .erp-logo{font-family:'Unbounded',sans-serif;font-weight:900;font-size:24px;letter-spacing:-.04em;padding:0 8px}
@@ -1857,12 +1857,71 @@ footer.site-full{gap:32px}
     });
   }
 
+  /* ---------------- MUESTRAS DE TELA (cliente) ---------------- */
+  function openMuestras() {
+    const ov = document.createElement('div');
+    ov.className = 'ck-ov';
+    ov.innerHTML = `
+      <div class="ck">
+        <button class="ck-x" aria-label="Cerrar">×</button>
+        <div data-paso="form">
+          <h2>Pide tus muestras</h2>
+          <p class="ck-sub">Te mandamos los 4 tonos a tu puerta, gratis y sin compromiso. Entregamos en CDMX, área metropolitana y Puebla.</p>
+          <form class="ck-f">
+            <label class="w2">Nombre completo<input name="nombre" required autocomplete="name"></label>
+            <label>Correo<input name="email" type="email" required autocomplete="email"></label>
+            <label>WhatsApp<input name="tel" required inputmode="tel" autocomplete="tel" placeholder="10 dígitos"></label>
+            <label class="w2">Calle y número<input name="calle" required autocomplete="street-address"></label>
+            <label>Colonia<input name="colonia" required></label>
+            <label>Código postal<input name="cp" required inputmode="numeric" maxlength="5" pattern="[0-9]{5}"></label>
+            <label class="w2">Zona<select name="zona" required>${ZONAS.map(z => `<option>${z}</option>`).join('')}</select></label>
+            <label class="w2">Referencias<input name="refs" placeholder="Ej. portón negro, depto 402…"></label>
+            <input name="web" tabindex="-1" autocomplete="off" aria-hidden="true" style="position:absolute;left:-9999px;width:1px;height:1px">
+            <div class="ck-legal w2">
+              <label class="ck-chk"><input type="checkbox" name="okPrivacidad" required><span>Leí el <a href="#/legal?doc=privacidad" target="_blank">Aviso de privacidad</a> y acepto que ${esc(LG().marca || 'Min')} use mis datos para enviarme las muestras y contactarme sobre el envío.</span></label>
+            </div>
+            <button class="btn-primary w2" type="submit">Pedir muestras gratis</button>
+            <p class="ck-err w2" data-err hidden></p>
+          </form>
+        </div>
+        <div data-paso="ok" hidden style="text-align:center;padding:18px 0 6px">
+          <h2>¡Listo!</h2>
+          <p class="ck-sub" style="margin:10px 0 22px">Recibimos tu solicitud. Te escribimos por WhatsApp para confirmar el envío de tus muestras.</p>
+          <button class="btn-primary" data-cerrar>Seguir viendo</button>
+        </div>
+      </div>`;
+    document.body.appendChild(ov);
+    const close = () => ov.remove();
+    ov.querySelector('.ck-x').onclick = close;
+    ov.querySelector('[data-cerrar]').onclick = close;
+    ov.addEventListener('click', e => { if (e.target === ov) close(); });
+    ov.querySelector('.ck-f').addEventListener('submit', async e => {
+      e.preventDefault();
+      const f = Object.fromEntries(new FormData(e.target).entries());
+      const web = f.web; delete f.web; delete f.okPrivacidad;
+      const btn = e.target.querySelector('[type="submit"]'), err = ov.querySelector('[data-err]'), txt = btn.textContent;
+      btn.disabled = true; btn.textContent = 'Enviando…'; err.hidden = true;
+      try {
+        await apiJ('/api/samples', {
+          method: 'POST', headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ customer: f, okPrivacidad: true, web })
+        });
+        ov.querySelector('[data-paso="form"]').hidden = true;
+        ov.querySelector('[data-paso="ok"]').hidden = false;
+      } catch (x) {
+        err.textContent = x.message || 'No se pudo enviar. Intenta de nuevo.'; err.hidden = false;
+        btn.disabled = false; btn.textContent = txt;
+      }
+    });
+  }
+
   /* ---------------- ERP ---------------- */
   const ICON = {
     home: '<path d="M4 11l8-7 8 7v9H4z"/>', box: '<path d="M4 7l8-4 8 4v10l-8 4-8-4z"/><path d="M4 7l8 4 8-4M12 11v10"/>',
     tool: '<path d="M14 6a4 4 0 0 0 5 5l-9 9-3-3 9-9a4 4 0 0 0-2-2z"/>', truck: '<path d="M3 6h11v10H3zM14 9h4l3 3.5V16h-7"/><circle cx="7" cy="17.5" r="1.8"/><circle cx="17" cy="17.5" r="1.8"/>',
     users: '<circle cx="9" cy="8" r="3.5"/><path d="M2.5 20a6.5 6.5 0 0 1 13 0M16 4.5a3.5 3.5 0 0 1 0 7M18 14a6 6 0 0 1 4 6"/>', gear: '<circle cx="12" cy="12" r="3"/><path d="M12 2v3M12 19v3M4.2 4.2l2.1 2.1M17.7 17.7l2.1 2.1M2 12h3M19 12h3M4.2 19.8l2.1-2.1M17.7 6.3l2.1-2.1"/>',
     grid: '<rect x="3" y="3" width="7" height="7" rx="1.5"/><rect x="14" y="3" width="7" height="7" rx="1.5"/><rect x="3" y="14" width="7" height="7" rx="1.5"/><rect x="14" y="14" width="7" height="7" rx="1.5"/>',
+    swatch: '<rect x="3" y="3" width="8" height="8" rx="2"/><rect x="13" y="3" width="8" height="8" rx="2"/><rect x="3" y="13" width="8" height="8" rx="2"/><path d="M13 17h8M17 13v8"/>',
     mail: '<rect x="3" y="5" width="18" height="14" rx="2"/><path d="M3 7l9 6 9-6"/>', img: '<rect x="3" y="5" width="18" height="14" rx="2"/><circle cx="9" cy="10" r="1.8"/><path d="M21 16l-5-5-8 8"/>', print: '<path d="M6 9V3h12v6M6 18H4v-7h16v7h-2M8 14h8v7H8z"/>', out: '<path d="M10 4H5v16h5M15 8l4 4-4 4M19 12H9"/>'
   };
   const ic = n => `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">${ICON[n]}</svg>`;
@@ -1887,7 +1946,7 @@ footer.site-full{gap:32px}
       <div class="erp">
         <aside class="erp-side">
           <div class="erp-logo">min.<span>ERP</span></div>
-          <nav>${[['resumen', 'home', 'Resumen'], ['pedidos', 'box', 'Pedidos'], ['produccion', 'tool', 'Producción'], ['envios', 'truck', 'Envíos'], ['clientes', 'users', 'Clientes'], ['catalogo', 'grid', 'Catálogo'], ['galeria', 'img', 'Galería'], ['ajustes', 'gear', 'Ajustes']]
+          <nav>${[['resumen', 'home', 'Resumen'], ['pedidos', 'box', 'Pedidos'], ['produccion', 'tool', 'Producción'], ['envios', 'truck', 'Envíos'], ['clientes', 'users', 'Clientes'], ['muestras', 'swatch', 'Muestras'], ['catalogo', 'grid', 'Catálogo'], ['galeria', 'img', 'Galería'], ['ajustes', 'gear', 'Ajustes']]
             .map(([k, i, t]) => `<button data-v="${k}" class="${view === k ? 'on' : ''}">${ic(i)}<span>${t}</span></button>`).join('')}</nav>
           <div class="erp-side-f">
             <a href="${location.pathname.endsWith('erp.html') ? 'index.html' : '#/'}">Ver tienda</a>
@@ -1900,7 +1959,7 @@ footer.site-full{gap:32px}
     root.querySelectorAll('.erp-side nav button').forEach(b => b.onclick = () => { view = b.dataset.v; sel.clear(); SRV = null; mount(root); });
     root.querySelector('[data-logout]').onclick = async () => { await API('/api/admin/logout', { method: 'POST' }).catch(() => {}); SRV = null; document.body.classList.remove('erp-on'); location.hash = '#/'; };
     const main = root.querySelector('#erpMain');
-    ({ resumen, pedidos, produccion, envios, clientes, catalogo, galeria, ajustes })[view](main, root);
+    ({ resumen, pedidos, produccion, envios, clientes, muestras, catalogo, galeria, ajustes })[view](main, root);
   }
 
   function login(root) {
@@ -2116,6 +2175,39 @@ footer.site-full{gap:32px}
       </tbody></table></div></div>`;
   }
 
+  /* ---- Muestras de tela (solicitudes desde la tienda) ---- */
+  let fMuestra = 'pendiente';
+  async function muestras(main) {
+    main.innerHTML = head('Muestras de tela', 'Cargando…');
+    let rows;
+    try { rows = await apiJ('/api/admin/samples'); }
+    catch (e) { main.innerHTML = head('Muestras de tela', 'No se pudieron cargar: ' + esc(e.message)); return; }
+    const EST = { pendiente: ['Por enviar', '#C2410C'], enviada: ['Enviada', '#1E7D46'], cancelada: ['Cancelada', '#8A8F96'] };
+    const n = k => rows.filter(r => r.estado === k).length;
+    const list = fMuestra === 'todas' ? rows : rows.filter(r => r.estado === fMuestra);
+    main.innerHTML = head('Muestras de tela', `${n('pendiente')} por enviar · ${rows.length} en total`) + `
+      <div class="cat-tabs">${[['pendiente', 'Por enviar', n('pendiente')], ['enviada', 'Enviadas', n('enviada')], ['todas', 'Todas', rows.length]]
+        .map(([k, t, c]) => `<button class="${fMuestra === k ? 'on' : ''}" data-f="${k}">${t} <small>${c}</small></button>`).join('')}</div>
+      <div class="panel"><div class="tw"><table class="tbl"><thead><tr><th>Fecha</th><th>Nombre</th><th>Contacto</th><th>Dirección</th><th>Estado</th><th></th></tr></thead><tbody>
+      ${list.map(r => { const c = r.customer || {}, e = EST[r.estado] || [r.estado, '#8A8F96'];
+        return `<tr><td>${fshort(r.created_at)}</td><td><b>${esc(c.nombre)}</b></td>
+          <td><a href="mailto:${esc(c.email)}">${esc(c.email)}</a><small><a href="https://wa.me/52${esc(String(c.tel || '').replace(/\D/g, '').slice(-10))}" target="_blank" rel="noopener">WhatsApp ${esc(c.tel)}</a></small></td>
+          <td>${esc(c.calle)}, ${esc(c.colonia)}<small>C.P. ${esc(c.cp)} · ${esc(c.zona)}${c.refs ? ' · ' + esc(c.refs) : ''}</small></td>
+          <td><span class="eb" style="--c:${e[1]}">${e[0]}</span>${r.enviada_at ? `<small>${fshort(r.enviada_at)}</small>` : ''}</td>
+          <td class="r">${r.estado === 'pendiente' ? `<button class="btn-primary sm" data-set="enviada" data-id="${r.id}">Marcar enviada</button>` : r.estado === 'enviada' ? `<button class="btn-secondary sm" data-set="pendiente" data-id="${r.id}">Deshacer</button>` : ''}</td></tr>`; }).join('')
+        || `<tr><td colspan="6" class="muted">${rows.length ? 'Nada en esta vista.' : 'Todavía no hay solicitudes de muestras.'}</td></tr>`}
+      </tbody></table></div></div>`;
+    main.querySelectorAll('[data-f]').forEach(b => b.onclick = () => { fMuestra = b.dataset.f; muestras(main); });
+    main.querySelectorAll('[data-set]').forEach(b => b.onclick = async () => {
+      b.disabled = true;
+      try {
+        await apiJ('/api/admin/samples?id=' + b.dataset.id, { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ estado: b.dataset.set }) });
+        toast(b.dataset.set === 'enviada' ? 'Marcada como enviada' : 'Regresó a por enviar');
+      } catch (e) { toast(e.message); }
+      muestras(main);
+    });
+  }
+
   /* ---- Galería (página Nuestra fábrica) ---- */
   function galeria(main) {
     if (!window.MinGaleria) { main.innerHTML = head('Galería', 'Módulo no cargado'); return; }
@@ -2222,7 +2314,7 @@ footer.site-full{gap:32px}
     });
   }
 
-  window.MinERP = { mount, openCheckout, all };
+  window.MinERP = { mount, openCheckout, openMuestras, all };
 })();
 
 </script>
@@ -2249,8 +2341,8 @@ footer.site-full{gap:32px}
     pisosSinElevador: 3,                     // pisos por escalera incluidos en el flete
     espera: 30,                              // minutos de tolerancia en domicilio
     tolerancia: '±2 cm',
-    version: '2026-09-26',
-    actualizado: '26 de septiembre de 2026'
+    version: '2026-09-29',
+    actualizado: '29 de septiembre de 2026'
   };
   const L = LEGAL;
   const wa = () => L.whatsapp ? `WhatsApp +52 ${L.whatsapp.replace(/(\d{2})(\d{4})(\d{4})$/, '$1 $2 $3')}` : 'WhatsApp [por confirmar]';
@@ -2475,7 +2567,8 @@ footer.site-full{gap:32px}
         <li><b>Entrega:</b> domicilio (calle, número, colonia, código postal, zona), referencias, piso y si hay elevador.</li>
         <li><b>Facturación</b> (solo si la pides): RFC, razón social, régimen fiscal, código postal fiscal y uso de CFDI.</li>
         <li><b>Pedido:</b> productos, montos, estado del pago y de la entrega, y evidencia fotográfica de entrega.</li>
-        <li><b>Evidencia de aceptación:</b> fecha, hora y versión de los términos que aceptaste, y la dirección IP y el navegador desde los que hiciste tu compra.</li>
+        <li><b>Muestras de tela:</b> si pides muestras gratis, tu nombre, correo, WhatsApp y el domicilio donde quieres recibirlas. Para esto no necesitas comprar.</li>
+        <li><b>Evidencia de aceptación:</b> fecha, hora y versión de los términos o de este aviso que aceptaste, y la dirección IP y el navegador desde los que hiciste tu compra o tu solicitud de muestras.</li>
       </ul>
       <p><b>No recabamos datos personales sensibles.</b> <b>No recibimos ni guardamos datos de tu tarjeta:</b> el pago lo procesa Mercado Pago, que trata esos datos bajo su propio aviso de privacidad.</p>
 
@@ -2483,6 +2576,7 @@ footer.site-full{gap:32px}
       <p><b>Finalidades necesarias</b> para la relación contigo:</p>
       <ul>
         <li>Procesar, confirmar y cobrar tu pedido.</li>
+        <li>Enviarte las muestras de tela que pediste y contactarte para coordinar ese envío.</li>
         <li>Fabricar tu mueble.</li>
         <li>Programar y realizar la entrega, y documentarla.</li>
         <li>Contactarte sobre tu pedido por WhatsApp, correo o teléfono.</li>
@@ -2499,7 +2593,7 @@ footer.site-full{gap:32px}
 
       <h2>Con quién los compartimos</h2>
       <ul>
-        <li><b>Transportistas y fleteros</b> que realizan tu entrega (nombre, teléfono y domicilio).</li>
+        <li><b>Transportistas, fleteros y paqueterías</b> que realizan tu entrega o el envío de tus muestras (nombre, teléfono y domicilio).</li>
         <li><b>Mercado Pago</b>, para procesar tu pago.</li>
         <li><b>Proveedores de tecnología</b> (hospedaje, base de datos y envío de correos) que tratan los datos por cuenta de ${L.marca} y solo para prestarnos ese servicio.</li>
         <li><b>Autoridades</b>, cuando una ley o un mandato así lo exija.</li>
@@ -3359,7 +3453,7 @@ function renderHome(app, scrollTo) {
   renderCatalog();
 
   app.querySelector('#pins').innerHTML = TONES.map(t => `<div class="pin" style="background:${t.c}"></div>`).join('');
-  app.querySelector('#pideMuestras').addEventListener('click', () => showToast('Muestras solicitadas (mock) — te llegarían en 3-5 días'));
+  app.querySelector('#pideMuestras').addEventListener('click', () => MinERP.openMuestras());
 
   mountPlanner(app.querySelector('#plannerRoot'));
 
