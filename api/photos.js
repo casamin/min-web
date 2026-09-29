@@ -10,8 +10,9 @@ function supa() {
   if (!url || !key) return null;
   return { url, key };
 }
-function publicUrl(base, path) {
-  return `${base}/storage/v1/object/public/${BUCKET}/${path}`;
+function publicUrl(base, path, ts) {
+  const v = ts ? `?v=${Date.parse(ts) || ''}` : '';
+  return `${base}/storage/v1/object/public/${BUCKET}/${path}${v}`;
 }
 
 module.exports = async (req, res) => {
@@ -20,13 +21,13 @@ module.exports = async (req, res) => {
   const s = supa();
   if (!s) return send(res, 200, []); // sin Supabase configurado: la tienda usa sus placeholders
   try {
-    const r = await fetch(`${s.url}/rest/v1/product_photos?select=product,tone,kind,storage_path`, {
+    const r = await fetch(`${s.url}/rest/v1/product_photos?select=product,tone,kind,storage_path,updated_at`, {
       headers: { apikey: s.key, Authorization: `Bearer ${s.key}` }
     });
     if (!r.ok) return send(res, 200, []);
     const rows = await r.json();
     res.setHeader('Cache-Control', 'public, max-age=60');
-    return send(res, 200, rows.map(row => ({ product: row.product, tone: row.tone, kind: row.kind, url: publicUrl(s.url, row.storage_path) })));
+    return send(res, 200, rows.map(row => ({ product: row.product, tone: row.tone, kind: row.kind, url: publicUrl(s.url, row.storage_path, row.updated_at) })));
   } catch (e) {
     return send(res, 200, []);
   }

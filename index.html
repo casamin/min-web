@@ -764,6 +764,22 @@ footer.site-full{gap:32px}
 
 .ck-f>*{min-width:0}
 .ck-f select{width:100%;min-width:0}
+.cat-tabs{display:flex;flex-wrap:wrap;gap:6px;background:#fff;border-radius:14px;padding:4px;margin:14px 0}
+.cat-tabs button{padding:9px 14px;border-radius:10px;font-weight:800;font-size:13px;color:var(--mute2)}
+.cat-tabs button small{font-weight:700;opacity:.7;margin-left:4px}
+.cat-tabs button small.ok{color:#1E7D46;opacity:1}
+.cat-tabs button.on{background:var(--ink);color:#fff}
+.cat-tabs button.on small.ok{color:#8FE0B0}
+.cat-tone{padding:14px 0;border-top:1px solid var(--line2)}
+.cat-tone:first-of-type{border-top:0;padding-top:6px}
+.cat-tone-h{display:flex;align-items:center;gap:10px;font-size:15px}
+.cat-tone-h small{color:var(--mute);font-weight:700}
+.cat-sw{width:22px;height:22px;border-radius:50%;box-shadow:inset 0 0 0 1px rgba(0,0,0,.12)}
+.cat-row{display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:10px;margin-top:10px}
+.cat-row .gl-empty{justify-content:flex-start;padding-top:12%;gap:3px}
+.cat-row .gl-empty span{font-size:13px}
+.cat-row .gl-empty small{font-size:11px;line-height:1.3}
+@media (max-width:760px){.cat-row{grid-template-columns:repeat(5,150px);overflow-x:auto;padding-bottom:6px;scroll-snap-type:x mandatory}.cat-row .gl-slot{scroll-snap-align:start}.cat-row .gl-empty small{display:none}}
 
 </style>
 </head>
@@ -2686,8 +2702,8 @@ footer.site-full{gap:32px}
 </script>
 <script>
 /* ===== Min — Catálogo: fotos reales de producto (panel del ERP) =====
-   A diferencia de "Galería" (fotos de la fábrica, guardadas en este navegador de momento),
-   este panel sube fotos de verdad: van a Supabase Storage a través del backend en min-prod,
+   5 tomas por modelo y por color: Frente, 3/4, Lateral 90°, Escenario, Close up.
+   5 modelos × 4 colores × 5 tomas = 100 fotos. Suben a Supabase Storage a través del backend,
    protegidas por la sesión de administrador (cookie firmada por el servidor). El service_role
    key nunca toca el navegador — solo vive en Vercel. */
 (function () {
@@ -2695,14 +2711,28 @@ footer.site-full{gap:32px}
     ['sofa', 'Sofá 2.40'], ['sofa2', 'Sofá 2.00'], ['sillon', 'Sillón'], ['chaise', 'Chaise'], ['cama', 'Cama']
   ];
   const TONOS = ['Nube', 'Arena', 'Grafito', 'Olivo'];
-  const KINDS = [['main', 'Catálogo'], ['det', 'Detalle / tela']];
+  const TONO_C = ['#E4E1DB', '#C9B8A0', '#4E5054', '#6E6C3F'];
+  const SHOTS = [
+    ['frente', 'Frente', 'De frente'],
+    ['tres_cuartos', '3/4', 'Girado 45°'],
+    ['lateral', 'Lateral 90°', 'De perfil'],
+    ['escenario', 'Escenario', 'En ambiente'],
+    ['closeup', 'Close up', 'Tela y costuras']
+  ];
+  let actual = 'sofa';
 
   const esc = s => String(s).replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
-  const vacio = lbl => `<div class="gl-empty"><svg viewBox="0 0 24 24" width="30" height="30" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="6" width="18" height="14" rx="3"/><path d="M8 6l1.5-2.5h5L16 6"/><circle cx="12" cy="13" r="3.5"/></svg><span>${esc(lbl)}</span><small>Foto pendiente</small></div>`;
-  // Mientras el ERP siga siendo un HTML suelto (no servido desde min-erp-api.vercel.app), las llamadas
-  // son de otro origen: por eso la URL absoluta y credentials:'include' (envía/recibe la cookie de sesión).
-  const API_BASE = window.MIN_API_BASE || 'https://min-casamins-projects.vercel.app';
+  const vacio = (lbl, hint) => `<div class="gl-empty"><svg viewBox="0 0 24 24" width="26" height="26" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="6" width="18" height="14" rx="3"/><path d="M8 6l1.5-2.5h5L16 6"/><circle cx="12" cy="13" r="3.5"/></svg><span>${esc(lbl)}</span><small>${esc(hint)}</small></div>`;
+  const API_BASE = window.MIN_API_BASE || (location.protocol.startsWith('http') ? '' : 'https://min-casamins-projects.vercel.app');
   const api = (path, opts) => fetch(API_BASE + path, Object.assign({ credentials: 'include' }, opts));
+
+  // Foto que la tienda muestra hoy si todavía no subes una (solo existen Frente y Close up de origen).
+  function fotoBase(pid, ti, shot) {
+    if (typeof IMGS === 'undefined') return null;
+    if (shot === 'frente') return (IMGS[pid] || [])[ti] || null;
+    if (shot === 'closeup') return (IMGS[pid + '_det'] || [])[ti] || null;
+    return null;
+  }
 
   function comprimir(file, max, q) {
     return new Promise((ok, bad) => {
@@ -2730,17 +2760,10 @@ footer.site-full{gap:32px}
     try { sess = await api('/api/admin/session').then(r => r.json()); }
     catch (e) { sess = null; errDetail = (e && (e.message || e.name)) || String(e); }
     if (!sess) {
-      const esOrigenArchivo = location.protocol === 'file:';
       main.innerHTML = head('Catálogo · Fotos de producto', '') + `
         <div class="panel"><p><b>No hay conexión con el servidor.</b></p>
-        <p class="muted sm">Este panel sube fotos de verdad (Supabase + Vercel), así que necesita que min-prod esté desplegado. Si estás viendo esto en el mockup local o el sitio aún no está desplegado, este panel no puede conectarse todavía — la Galería de la fábrica sigue funcionando normal mientras tanto.</p>
-        ${errDetail ? `<p class="muted sm" style="font-family:monospace;font-size:11px;opacity:.8">Detalle técnico: ${esc(errDetail)}</p>` : ''}
-        ${esOrigenArchivo ? `<p class="muted sm" style="color:#B3261E">Estás abriendo este archivo directo desde tu computadora (file://). Algunos navegadores bloquean estas conexiones en ese modo. Prueba abrirlo así en vez de doble clic:</p>
-        <ol class="muted sm" style="padding-left:18px">
-          <li>Abre la carpeta de Descargas en una terminal / símbolo del sistema</li>
-          <li>Escribe: <code>python -m http.server 8000</code> (o <code>py -m http.server 8000</code>)</li>
-          <li>En Chrome, abre <code>http://localhost:8000/min-funcional.html</code></li>
-        </ol>` : ''}</div>`;
+        <p class="muted sm">Este panel sube fotos de verdad (Supabase + Vercel), así que necesita abrirse desde la tienda publicada.</p>
+        ${errDetail ? `<p class="muted sm" style="font-family:monospace;font-size:11px;opacity:.8">Detalle técnico: ${esc(errDetail)}</p>` : ''}</div>`;
       return;
     }
     if (!sess.admin) return loginGate(main, head, toast);
@@ -2771,28 +2794,44 @@ footer.site-full{gap:32px}
     try { fotos = await api('/api/admin/photos').then(r => r.json()); } catch (e) { /* noop */ }
     const byKey = {};
     (Array.isArray(fotos) ? fotos : []).forEach(f => byKey[`${f.product}-${f.tone}-${f.kind}`] = f);
-    const max = PRODUCTS.length * TONOS.length * KINDS.length, total = Object.keys(byKey).length;
+    const cuenta = pid => TONOS.reduce((n, _, ti) => n + SHOTS.filter(([k]) => byKey[`${pid}-${ti}-${k}`]).length, 0);
+    const porModelo = SHOTS.length * TONOS.length;
+    const total = PRODUCTS.reduce((n, [pid]) => n + cuenta(pid), 0), max = PRODUCTS.length * porModelo;
+    const plabel = PRODUCTS.find(([p]) => p === actual)[1];
 
-    main.innerHTML = head('Catálogo · Fotos de producto', `${total} de ${max} fotos subidas · <a href="index.html" target="_blank">Ver tienda ↗</a>`) + `
+    main.innerHTML = head('Catálogo · Fotos de producto', `${total} de ${max} fotos subidas · <a href="#/" target="_blank">Ver tienda ↗</a>`) + `
       <div class="panel gl-tips">
-        <p><b>Cómo funciona:</b> toca una foto para subir o cambiar. Se comprime sola (máx. 1600 px). "Catálogo" es la foto principal de la tarjeta del producto; "Detalle" es el acercamiento a la tela/textura de ese tono.</p>
+        <p><b>5 fotos por color:</b> Frente, 3/4, Lateral 90°, Escenario y Close up — en ese orden aparecen en la ficha del producto. Toca un cuadro para subir o cambiar la foto; se comprime sola (máx. 1600 px).</p>
       </div>
-      ${PRODUCTS.map(([pid, plabel]) => `
-        <div class="panel"><h3>${plabel}</h3>
-          <div class="gl-adm">
-            ${TONOS.map((tono, ti) => KINDS.map(([k, klabel]) => {
-              const f = byKey[`${pid}-${ti}-${k}`];
-              const key = `${pid}|${ti}|${k}`;
-              return `<div class="gl-slot ${f ? 'has' : ''}">
-                <label class="gl-drop">${f ? `<img src="${esc(f.url)}" alt="">` : vacio(`${tono} · ${klabel}`)}
-                  <input type="file" accept="image/*" data-up="${key}" hidden>
-                  <span class="gl-over">${f ? 'Cambiar foto' : 'Subir foto'}</span></label>
-                <div class="gl-meta"><b>${tono} · ${klabel}</b>${f ? `<button class="gl-rm" data-rm="${key}">Quitar</button>` : `<small>Vacío</small>`}</div>
-              </div>`;
-            }).join('')).join('')}
-          </div>
-        </div>`).join('')}`;
+      <div class="cat-tabs">${PRODUCTS.map(([pid, lbl]) => {
+        const n = cuenta(pid);
+        return `<button class="${pid === actual ? 'on' : ''}" data-prod="${pid}">${esc(lbl)} <small class="${n === porModelo ? 'ok' : ''}">${n}/${porModelo}</small></button>`;
+      }).join('')}</div>
+      <div class="panel">
+        <h3>${esc(plabel)}</h3>
+        ${TONOS.map((tono, ti) => {
+          const n = SHOTS.filter(([k]) => byKey[`${actual}-${ti}-${k}`]).length;
+          return `<div class="cat-tone">
+            <div class="cat-tone-h"><span class="cat-sw" style="background:${TONO_C[ti]}"></span><b>${tono}</b><small>${n}/${SHOTS.length}</small></div>
+            <div class="cat-row">
+              ${SHOTS.map(([k, klabel, hint]) => {
+                const f = byKey[`${actual}-${ti}-${k}`];
+                const base = f ? null : fotoBase(actual, ti, k);
+                const src = f ? f.url : base;
+                const key = `${actual}|${ti}|${k}`;
+                return `<div class="gl-slot ${f || base ? 'has' : ''}">
+                  <label class="gl-drop">${src ? `<img src="${esc(src)}" alt="">` : vacio(klabel, hint)}
+                    <input type="file" accept="image/*" data-up="${key}" hidden>
+                    <span class="gl-over">${f || base ? 'Cambiar foto' : 'Subir foto'}</span></label>
+                  <div class="gl-meta"><b>${klabel}</b>${f ? `<button class="gl-rm" data-rm="${key}">Quitar</button>` : `<small>${base ? 'Foto actual' : 'Vacío'}</small>`}</div>
+                </div>`;
+              }).join('')}
+            </div>
+          </div>`;
+        }).join('')}
+      </div>`;
 
+    main.querySelectorAll('[data-prod]').forEach(b => b.addEventListener('click', () => { actual = b.dataset.prod; renderGrid(main, head, toast); }));
     main.querySelectorAll('[data-up]').forEach(inp => inp.addEventListener('change', async () => {
       const f = inp.files[0]; if (!f) return;
       if (!/^image\//.test(f.type)) return toast('Ese archivo no es una imagen');
@@ -2819,7 +2858,7 @@ footer.site-full{gap:32px}
     }));
   }
 
-  window.MinCatalogo = { admin };
+  window.MinCatalogo = { admin, SHOTS };
 })();
 
 </script>
@@ -3349,15 +3388,15 @@ function renderProducto(app, id) {
   }
   const $ = sel => app.querySelector(sel);
   function setTone(j) { state.tone = j; state.slide = 0; renderTone(); }
-  const SLOTS = ['Tres cuartos', 'Lateral', 'Ambiente'];
+  const SLOTS = [['tres_cuartos', 'Tres cuartos'], ['lateral', 'Lateral 90°'], ['escenario', 'Escenario']];
   function placeholder(lbl) {
     const svg = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1200 900"><rect width="1200" height="900" fill="#F2F3F5"/><rect x="24" y="24" width="1152" height="852" rx="28" fill="none" stroke="#C9CDD2" stroke-width="4" stroke-dasharray="18 14"/><g transform="translate(600 380)" fill="none" stroke="#9AA0A6" stroke-width="10" stroke-linejoin="round"><rect x="-90" y="-55" width="180" height="125" rx="18"/><path d="M-40 -55l14-28h52l14 28"/><circle cx="0" cy="8" r="36"/></g><text x="600" y="560" text-anchor="middle" font-family="Helvetica,Arial,sans-serif" font-size="52" font-weight="800" fill="#4A4D52">${lbl}</text><text x="600" y="620" text-anchor="middle" font-family="Helvetica,Arial,sans-serif" font-size="32" font-weight="600" fill="#8A8F96">Foto pendiente</text></svg>`;
     return 'data:image/svg+xml;charset=utf-8,' + encodeURIComponent(svg);
   }
   function slides() {
-    const extra = p.fotos[state.tone] || [];
-    const slots = SLOTS.map((lbl, k) => extra[k] ? { src: extra[k].src, lbl: extra[k].lbl } : { src: placeholder(lbl), lbl });
-    return [{ src: p.imgs[state.tone], lbl: 'Frente' }].concat(slots, [{ src: p.det[state.tone], lbl: 'Detalle' }], extra.slice(3).map(f => ({ src: f.src, lbl: f.lbl })));
+    const extra = p.fotos[state.tone] || [], up = p.up || {};
+    const slots = SLOTS.map(([k, lbl], i) => up[k + state.tone] ? { src: up[k + state.tone], lbl } : extra[i] ? { src: extra[i].src, lbl: extra[i].lbl } : { src: placeholder(lbl), lbl });
+    return [{ src: p.imgs[state.tone], lbl: 'Frente' }].concat(slots, [{ src: p.det[state.tone], lbl: 'Close up' }], extra.slice(3).map(f => ({ src: f.src, lbl: f.lbl })));
   }
   function goSlide(i) {
     const n = slides().length;
@@ -3507,6 +3546,30 @@ function router() {
 }
 window.addEventListener('hashchange', router);
 window.addEventListener('DOMContentLoaded', router);
+
+/* ===== Fotos reales subidas desde el ERP (Catálogo): Frente, 3/4, Lateral 90°, Escenario, Close up ===== */
+function aplicarFotos(rows) {
+  const swap = {};
+  rows.forEach(r => {
+    const p = PRODUCTS[r.product], t = Number(r.tone);
+    if (!p || !(t >= 0 && t <= 3) || !r.url) return;
+    if (r.kind === 'frente') { swap[p.imgs[t]] = r.url; p.imgs[t] = r.url; }
+    else if (r.kind === 'closeup') { p.det[t] = r.url; }
+    else if (['tres_cuartos', 'lateral', 'escenario'].includes(r.kind)) { (p.up = p.up || {})[r.kind + t] = r.url; }
+  });
+  Object.values(PRODUCTS).forEach(p => { p.img = p.imgs[p.defaultTone]; });
+  const path = (location.hash.slice(1) || '/').split('?')[0];
+  if (path === '/erp') return;
+  if (path === '/producto') { router(); return; }
+  document.querySelectorAll('#app img').forEach(im => { const n = swap[im.getAttribute('src')]; if (n) im.src = n; });
+}
+if (/^https?:$/.test(location.protocol)) {
+  fetch('/api/photos').then(r => r.ok ? r.json() : []).then(rows => {
+    if (!Array.isArray(rows) || !rows.length) return;
+    if (document.readyState === 'loading') window.addEventListener('DOMContentLoaded', () => aplicarFotos(rows));
+    else aplicarFotos(rows);
+  }).catch(() => {});
+}
 </script>
 </body>
 </html>
