@@ -1,13 +1,13 @@
 // GET    /api/admin/photos              -> lista todas las fotos guardadas (product, tone, kind, url)
 // POST   /api/admin/photos               -> sube/reemplaza una foto { product, tone, kind, dataUrl }
 // DELETE /api/admin/photos?product=X&tone=N&kind=K -> quita una foto
-// kind: frente | tres_cuartos | lateral | escenario | closeup  (5 tomas por modelo y por color)
+// kind: portada (solo sofa) | tarjeta | frente | tres_cuartos | lateral | escenario | closeup
 // Toda la sesión se valida con isAdmin() (cookie HMAC firmada) — el service_role key nunca sale del servidor.
 const { isAdmin, send, readBody, cors } = require('../_lib');
 
 const PRODUCTS = ['sofa', 'sofa2', 'sillon', 'chaise', 'cama'];
 const BUCKET = 'product-photos';
-const KINDS = ['frente', 'tres_cuartos', 'lateral', 'escenario', 'closeup'];
+const KINDS = ['portada', 'tarjeta', 'frente', 'tres_cuartos', 'lateral', 'escenario', 'closeup'];
 const LEGACY = { main: 'frente', det: 'closeup' };
 const normKind = k => LEGACY[k] || k;
 
@@ -89,6 +89,7 @@ module.exports = async (req, res) => {
     const t = Number(tone);
     if (!Number.isInteger(t) || t < 0 || t > 3) return send(res, 400, { error: 'Tono inválido' });
     if (!KINDS.includes(kind)) return send(res, 400, { error: 'Tipo de foto inválido' });
+    if (kind === 'portada' && product !== 'sofa') return send(res, 400, { error: 'La portada es solo del Sofá 2.40' });
     const m = /^data:(image\/(?:jpeg|png|webp));base64,(.+)$/.exec(dataUrl || '');
     if (!m) return send(res, 400, { error: 'Imagen inválida (se espera JPEG/PNG/WebP en base64)' });
     const [, mime, b64] = m;

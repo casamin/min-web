@@ -158,4 +158,37 @@ function resumenTxt(o) {
     `\n\nSubtotal: ${fmt(o.subtotal)}\nFlete (${FLETE[o.flete.tipo].name}): ${o.flete.costo ? fmt(o.flete.costo) : 'Gratis'}\nTotal: ${fmt(o.total)}`;
 }
 
-module.exports = { CATALOGO, TONOS, FLETE, ZONAS, cotizar, db, nextFolio, rowToOrder, iso, isAdmin, makeSession, setSession, safeEqual, readBody, send, baseUrl, mail, fmt, resumenTxt, MEM, cors };
+
+/* ---------- Mercado Pago: reconsulta un pago directo con MP y actualiza el pedido ----------
+   Lo usan el webhook y la página de regreso (/api/order-status). Nunca confía en lo que diga el navegador. */
+async function syncPayment(paymentId, expectedOrderId) {
+  const token = process.env.MP_ACCESS_TOKEN;
+  if (!token || !paymentId) return null;
+  const r = await fetch(`https://api.mercadopago.com/v1/payments/${encodeURIComponent(paymentId)}`, {
+    headers: { Authorization: `Bearer ${token}` }
+  });
+  if (!r.ok) return null;
+  const pago = await r.json();
+  const orderId = pago.external_reference;
+  if (!orderId || !/^MIN-\d+$/.test(orderId)) return null;       // pago de otra marca de Casa Min: no es nuestro
+  if (expectedOrderId && orderId !== expectedOrderId) return null;
+  const rows = await db(`orders?id=eq.${orderId}`);
+  const o = Array.isArray(rows) ? rows[0] : null;
+  if (!o) return null;
+  if (Number(pago.transaction_amount) + 0.5 < Number(o.total)) return o; // monto no cuadra: no se marca pagado
+  const estadoPago = pago.status === 'approved' ? 'aprobado'
+    : (pago.status === 'refunded' || pago.status === 'charged_back') ? 'reembolsado'
+    : (pago.status === 'rejected' || pago.status === 'cancelled') ? 'rechazado' : 'pendiente';
+  if (o.pago_estado === 'aprobado' && estadoPago !== 'reembolsado') return o;  // ya estaba pagado: no retroceder
+  const patch = { pago_estado: estadoPago, mp_payment_id: String(pago.id) };
+  if (estadoPago === 'aprobado') { patch.paid_at = new Date().toISOString(); if (o.estado === 'pendiente') patch.estado = 'pagado'; }
+  const up = await db(`orders?id=eq.${orderId}`, { method: 'PATCH', body: patch });
+  const nuevo = Array.isArray(up) ? up[0] : o;
+  if (estadoPago === 'aprobado' && o.pago_estado !== 'aprobado' && o.customer && o.customer.email) {
+    await mail(o.customer.email, `Confirmación de tu pedido ${orderId} — Min`,
+      `¡Gracias por tu compra!\n\n${resumenTxt({ items: o.items, subtotal: o.subtotal, flete: o.flete, total: o.total })}\n\nTu pedido: ${orderId}`).catch(() => false);
+  }
+  return nuevo;
+}
+
+module.exports = { CATALOGO, syncPayment, TONOS, FLETE, ZONAS, cotizar, db, nextFolio, rowToOrder, iso, isAdmin, makeSession, setSession, safeEqual, readBody, send, baseUrl, mail, fmt, resumenTxt, MEM, cors };

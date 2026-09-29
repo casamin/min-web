@@ -657,6 +657,8 @@ body.erp-on #nav,body.erp-on #footer{display:none}
 
 .tn>span{display:inline-flex;gap:5px;align-items:baseline}.tn small.cat{font-size:10px;color:var(--mute);font-weight:700;text-transform:uppercase;letter-spacing:.04em}
 .hb{grid-template-columns:130px 1fr auto}
+.ck-err{background:#FDECEA;color:#8C1D18;border-radius:12px;padding:10px 12px;font-size:13px;font-weight:600;margin:0}
+.ck-mp:disabled{opacity:.7;cursor:wait}
 
 /* ===== Footer completo ===== */
 footer.site-full{gap:32px}
@@ -770,16 +772,38 @@ footer.site-full{gap:32px}
 .cat-tabs button small.ok{color:#1E7D46;opacity:1}
 .cat-tabs button.on{background:var(--ink);color:#fff}
 .cat-tabs button.on small.ok{color:#8FE0B0}
+.cat-cnt{font-weight:700;color:var(--mute);font-size:13px;margin-left:6px}
+.cat-cols{display:grid;grid-template-columns:1fr 5fr;gap:10px;margin:10px 0 2px;font-size:11px;font-weight:800;letter-spacing:.06em;text-transform:uppercase;color:var(--mute)}
+.cat-cols span:last-child{padding-left:14px}
 .cat-tone{padding:14px 0;border-top:1px solid var(--line2)}
 .cat-tone:first-of-type{border-top:0;padding-top:6px}
 .cat-tone-h{display:flex;align-items:center;gap:10px;font-size:15px}
 .cat-tone-h small{color:var(--mute);font-weight:700}
 .cat-sw{width:22px;height:22px;border-radius:50%;box-shadow:inset 0 0 0 1px rgba(0,0,0,.12)}
-.cat-row{display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:10px;margin-top:10px}
-.cat-row .gl-empty{justify-content:flex-start;padding-top:12%;gap:3px}
+.cat-row{display:grid;gap:10px;margin-top:10px}
+.cat-row4{grid-template-columns:repeat(4,minmax(0,1fr))}
+.cat-row6{grid-template-columns:repeat(6,minmax(0,1fr))}
+.cat-row6>.gl-slot:first-child{padding-right:14px;border-right:2px solid var(--line2)}
+.cat-row6>.gl-slot:nth-child(2){margin-left:4px}
+.cat-row .gl-drop.wb img{object-fit:contain;padding:8px;background:#fff}
+.cat-row .gl-empty{justify-content:flex-start;padding-top:7%;gap:2px}
 .cat-row .gl-empty span{font-size:13px}
 .cat-row .gl-empty small{font-size:11px;line-height:1.3}
-@media (max-width:760px){.cat-row{grid-template-columns:repeat(5,150px);overflow-x:auto;padding-bottom:6px;scroll-snap-type:x mandatory}.cat-row .gl-slot{scroll-snap-align:start}.cat-row .gl-empty small{display:none}}
+@media (max-width:760px){
+  .cat-cols{display:none}
+  .cat-row4,.cat-row6{grid-template-columns:none;grid-auto-flow:column;grid-auto-columns:150px;overflow-x:auto;padding-bottom:6px;scroll-snap-type:x mandatory}
+  .cat-row .gl-slot{scroll-snap-align:start}
+  .cat-row .gl-empty small{display:none}
+}
+.cat-pv-ov{position:fixed;inset:0;background:rgba(22,21,19,.55);z-index:200;display:flex;align-items:center;justify-content:center;padding:16px}
+.cat-pv{background:#F2F3F5;border-radius:22px;padding:22px;width:min(460px,100%);max-height:92vh;overflow:auto}
+.cat-pv h3{margin:0 0 6px;font-size:18px}
+.cat-pv-warn{background:#FDECEA;color:#8C1D18;border-radius:12px;padding:10px 12px;font-size:13px;line-height:1.4;margin:8px 0}
+.cat-pv-card{margin:12px auto 0;max-width:340px}
+.cat-pv-hero{background:#fff;border-radius:18px;padding:18px 8px;margin-top:12px;display:flex;align-items:center;justify-content:center;min-height:200px}
+.cat-pv-hero img{width:100%;mix-blend-mode:multiply}
+.cat-pv-btns{display:flex;gap:10px;justify-content:flex-end;margin-top:16px}
+.cat-pv-btns button{height:44px;padding:0 18px}
 
 </style>
 </head>
@@ -1619,19 +1643,23 @@ footer.site-full{gap:32px}
 
 </script>
 <script>
-/* ===== Min ERP (mock funcional) + checkout con Mercado Pago simulado =====
+/* ===== Min ERP + checkout con Mercado Pago =====
    Depende de: PRODUCTS, TONES, fmt, getCart, saveCart, updateCartBadge, MinFlete
-   Datos en localStorage: min_orders, min_erp_cfg. En producción esto vive en Supabase. */
+   Pedidos: en Supabase, vía /api (sesión de administrador con cookie firmada por el servidor).
+   El checkout crea el pedido y la preferencia en /api/checkout y abre el pago real de Mercado Pago.
+   localStorage solo guarda ajustes del panel (correos) y cambios de los pedidos demo. */
 (function () {
-  const ORD = 'min_orders', CFG = 'min_erp_cfg', AUTH = 'min_erp_ok';
-  const PASS = 'min2026';                       // mock — en producción: auth del servidor
+  const CFG = 'min_erp_cfg';
+  const API = (path, opts) => fetch(path, Object.assign({ credentials: 'include' }, opts || {}));
+  const apiJ = async (path, opts) => { const r = await API(path, opts); const j = await r.json().catch(() => ({})); if (!r.ok) throw new Error(j.error || ('Error ' + r.status)); return j; };
+  let SRV = null, SESS = {};                    // pedidos del servidor (null = sin cargar) y estado de conexiones
   const DIAS_FAB = 21;
 
   const ls = {
     get(k, d) { try { const v = localStorage.getItem(k); return v ? JSON.parse(v) : d; } catch (e) { return d; } },
     set(k, v) { try { localStorage.setItem(k, JSON.stringify(v)); } catch (e) {} }
   };
-  const cfg = () => Object.assign({ taller: 'taller@casamin.mx', avisos: 'infominmx@gmail.com', demo: true }, ls.get(CFG, {}));
+  const cfg = () => Object.assign({ taller: 'taller@casamin.mx', avisos: 'infominmx@gmail.com', demo: false }, ls.get(CFG, {}));
   const setCfg = c => ls.set(CFG, Object.assign(cfg(), c));
 
   const ESTADOS = {
@@ -1666,8 +1694,7 @@ footer.site-full{gap:32px}
   }
 
   /* ---------------- datos ---------------- */
-  function real() { return ls.get(ORD, []); }
-  function saveReal(a) { ls.set(ORD, a); }
+  function real() { return SRV || []; }
 
   let DEMO = null;
   function demo() {
@@ -1723,15 +1750,17 @@ footer.site-full{gap:32px}
     return real().concat(d).sort((a, b) => b.createdAt - a.createdAt);
   }
   function update(id, patch) {
-    const rs = real(), i = rs.findIndex(o => o.id === id);
-    if (i >= 0) { rs[i] = Object.assign(rs[i], patch); saveReal(rs); return; }
+    const rs = real(), o = rs.find(x => x.id === id);
+    if (o) {
+      Object.assign(o, patch);
+      const body = {}; ['estado', 'notas', 'envio', 'produccion'].forEach(k => { if (patch[k] !== undefined) body[k] = patch[k]; });
+      if (Object.keys(body).length) apiJ('/api/admin/orders?id=' + encodeURIComponent(id), { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) })
+        .catch(e => toast('No se guardó el cambio: ' + e.message + '. Recarga la página.'));
+      return;
+    }
     const ed = demoEdits(); ed[id] = Object.assign(ed[id] || {}, patch); ls.set('min_erp_demo_edits', ed);
   }
   const get = id => all().find(o => o.id === id);
-  function nextFolio() {
-    const n = real().map(o => parseInt(o.id.slice(4))).filter(Boolean);
-    return 'MIN-' + (Math.max(2000, ...n) + 1);
-  }
 
   /* ---------------- correos (mailto) ---------------- */
   function mailto(to, subject, body) { return 'mailto:' + encodeURIComponent(to) + '?subject=' + encodeURIComponent(subject) + '&body=' + encodeURIComponent(body); }
@@ -1758,7 +1787,7 @@ footer.site-full{gap:32px}
   }
 
   /* ---------------- CHECKOUT (cliente) ---------------- */
-  function openCheckout(onDone) {
+  function openCheckout() {
     const cart = getCart(); if (!cart.length) return;
     const flK = MinFlete.fleteActual(), flC = MinFlete.fleteCosto();
     const sub = cart.reduce((a, b) => a + b.qty * b.unitPrice, 0);
@@ -1793,49 +1822,37 @@ footer.site-full{gap:32px}
             </div>
             <div class="ck-tot w2"><span>Subtotal ${fmt(sub)} · Flete ${flC ? fmt(flC) : 'gratis'}</span><b>${fmt(sub + flC)}</b></div>
             <button class="btn-primary w2 ck-mp" type="submit"><span class="mp-logo">mercado<b>pago</b></span> Pagar ${fmt(sub + flC)}</button>
+            <p class="ck-err w2" data-err hidden></p>
             <p class="ck-note w2">Pago seguro con Mercado Pago: tarjeta, meses sin intereses, OXXO o SPEI.</p>
           </form>
-        </div>
-        <div class="ck-step" data-s="2" hidden>
-          <div class="mp-sim">
-            <div class="mp-top"><span class="mp-logo big">mercado<b>pago</b></span><span class="mp-tag">SIMULACIÓN</span></div>
-            <div class="mp-amt">${fmt(sub + flC)}</div>
-            <p>Casa Min S.A. de C.V. · Pedido <b class="ck-folio"></b></p>
-            <p class="ck-note">En producción aquí se abre el checkout real de Mercado Pago y el resultado llega por webhook.</p>
-            <div class="mp-btns"><button class="btn-primary" data-r="aprobado">Aprobar pago</button><button class="btn-secondary" data-r="rechazado">Rechazar</button></div>
-          </div>
         </div>
       </div>`;
     document.body.appendChild(ov);
     const close = () => ov.remove();
     ov.querySelector('.ck-x').onclick = close;
     ov.addEventListener('click', e => { if (e.target === ov) close(); });
-    let order = null;
     const accSel = ov.querySelector('[name="acceso"]');
     accSel.addEventListener('change', () => { ov.querySelector('[data-warn]').hidden = !/o más/.test(accSel.value); });
-    ov.querySelector('.ck-f').addEventListener('submit', e => {
+    ov.querySelector('.ck-f').addEventListener('submit', async e => {
       e.preventDefault();
       const f = Object.fromEntries(new FormData(e.target).entries());
       delete f.okAccesos; delete f.okTerminos;
-      f.aceptacion = { version: LG().version, at: Date.now(), terminos: true, accesos: true };
-      order = {
-        id: nextFolio(), createdAt: Date.now(), paidAt: null, customer: f,
-        items: cart.map(i => ({ id: i.id, name: i.name, cat: catOf(i), tone: i.tone, size: i.size, qty: i.qty, unitPrice: i.unitPrice })),
-        subtotal: sub, flete: { tipo: flK, costo: flC }, total: sub + flC,
-        pago: { metodo: 'Mercado Pago', estado: 'pendiente', mpId: null }, estado: 'pendiente', notas: '', envio: {}, produccion: {}
-      };
-      saveReal([order].concat(real()));           // queda registrado aunque abandone el pago
-      ov.querySelector('.ck-folio').textContent = order.id;
-      ov.querySelector('[data-s="1"]').hidden = true; ov.querySelector('[data-s="2"]').hidden = false;
-    });
-    ov.querySelectorAll('.mp-btns button').forEach(b => b.onclick = () => {
-      const ok = b.dataset.r === 'aprobado';
-      update(order.id, ok
-        ? { paidAt: Date.now(), estado: 'pagado', pago: { metodo: 'Mercado Pago', estado: 'aprobado', mpId: String(9e10 + Math.floor(Math.random() * 1e9)) } }
-        : { pago: { metodo: 'Mercado Pago', estado: 'rechazado', mpId: null } });
-      close();
-      if (ok) saveCart([]);
-      onDone && onDone(get(order.id), ok);
+      const btn = ov.querySelector('.ck-mp'), err = ov.querySelector('[data-err]'), txt = btn.innerHTML;
+      btn.disabled = true; btn.textContent = 'Abriendo Mercado Pago…'; err.hidden = true;
+      try {
+        const j = await apiJ('/api/checkout', {
+          method: 'POST', headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            customer: f, okTerminos: true, okAccesos: true, fleteElegido: flK,
+            items: cart.map(i => ({ id: i.id, tone: i.tone, size: i.size, qty: i.qty }))
+          })
+        });
+        try { sessionStorage.setItem('min_ultimo_pedido', JSON.stringify({ id: j.orderId, email: f.email })); } catch (x) {}
+        location.href = j.initPoint;               // pago real de Mercado Pago; regresa a /?order=MIN-…
+      } catch (x) {
+        err.textContent = x.message || 'No se pudo iniciar el pago. Intenta de nuevo.'; err.hidden = false;
+        btn.disabled = false; btn.innerHTML = txt;
+      }
     });
   }
 
@@ -1853,8 +1870,17 @@ footer.site-full{gap:32px}
 
   let view = 'resumen', period = 30, fEstado = 'todos', q = '', sel = new Set();
 
+  async function cargar(root) {
+    document.body.classList.add('erp-on');
+    root.innerHTML = '<div class="erp-login"><form><div class="erp-logo">min.<span>ERP</span></div><p class="muted sm">Cargando…</p></form></div>';
+    try { SESS = await apiJ('/api/admin/session'); } catch (e) { SESS = {}; }
+    if (!SESS.admin) return login(root);
+    try { SRV = await apiJ('/api/admin/orders'); }
+    catch (e) { SRV = []; setTimeout(() => toast('No se pudieron cargar los pedidos: ' + e.message), 50); }
+    mount(root);
+  }
   function mount(root) {
-    if (sessionStorage.getItem(AUTH) !== '1') return login(root);
+    if (SRV === null) return cargar(root);
     document.body.classList.add('erp-on');
     root.innerHTML = `
       <div class="erp">
@@ -1870,8 +1896,8 @@ footer.site-full{gap:32px}
         <main class="erp-main" id="erpMain"></main>
         <div class="erp-drawer" id="erpDrawer" hidden></div>
       </div>`;
-    root.querySelectorAll('.erp-side nav button').forEach(b => b.onclick = () => { view = b.dataset.v; sel.clear(); mount(root); });
-    root.querySelector('[data-logout]').onclick = () => { sessionStorage.removeItem(AUTH); document.body.classList.remove('erp-on'); location.hash = '#/'; if (location.pathname.endsWith('erp.html')) location.href = 'index.html'; };
+    root.querySelectorAll('.erp-side nav button').forEach(b => b.onclick = () => { view = b.dataset.v; sel.clear(); SRV = null; mount(root); });
+    root.querySelector('[data-logout]').onclick = async () => { await API('/api/admin/logout', { method: 'POST' }).catch(() => {}); SRV = null; document.body.classList.remove('erp-on'); location.hash = '#/'; };
     const main = root.querySelector('#erpMain');
     ({ resumen, pedidos, produccion, envios, clientes, catalogo, galeria, ajustes })[view](main, root);
   }
@@ -1888,10 +1914,13 @@ footer.site-full{gap:32px}
           <a href="${location.pathname.endsWith('erp.html') ? 'index.html' : '#/'}">← Volver a la tienda</a>
         </form>
       </div>`;
-    root.querySelector('form').onsubmit = e => {
+    root.querySelector('form').onsubmit = async e => {
       e.preventDefault();
-      if (e.target.p.value === PASS) { sessionStorage.setItem(AUTH, '1'); mount(root); }
-      else root.querySelector('.err').hidden = false;
+      const er = root.querySelector('.err'); er.hidden = true;
+      try {
+        await apiJ('/api/admin/login', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ password: e.target.p.value }) });
+        SRV = null; mount(root);
+      } catch (x) { er.textContent = /incorrecta/i.test(x.message) ? 'Contraseña incorrecta' : 'No se pudo entrar: ' + x.message; er.hidden = false; }
     };
   }
 
@@ -2108,11 +2137,13 @@ footer.site-full{gap:32px}
           <label class="fld">Correo de avisos de venta<input data-k="avisos" value="${esc(c.avisos)}"></label>
           <button class="btn-primary sm" data-save>Guardar</button></div>
         <div class="panel"><h3>Mercado Pago</h3>
-          <p class="st"><span class="dot warn"></span><b>Simulado</b> — cuenta Casa Min pendiente de conectar al servidor de Min.</p>
-          <p class="muted sm">En producción: el checkout crea la preferencia en el servidor con la llave de Casa Min, y el webhook de Mercado Pago marca el pedido como pagado. La llave nunca va en la página.</p></div>
+          ${SESS.mp ? '<p class="st"><span class="dot ok"></span><b>Conectado</b> — cuenta Casa Min. Los pagos llegan con el folio MIN-… como referencia.</p>'
+            : '<p class="st"><span class="dot warn"></span><b>Sin conectar</b> — falta la variable MP_ACCESS_TOKEN en Vercel. Mientras tanto la tienda no puede cobrar.</p>'}
+          <p class="muted sm">El pedido se crea en el servidor con los precios oficiales y Mercado Pago avisa cuando se paga. La llave nunca va en la página.</p>
+          ${SESS.mail ? '' : '<p class="muted sm">Correos automáticos al cliente: sin configurar (se usan los botones de correo de cada pedido).</p>'}</div>
         <div class="panel"><h3>Datos</h3>
           <label class="tg"><input type="checkbox" data-demo ${c.demo ? 'checked' : ''}> Mostrar pedidos demo (${demo().length})</label>
-          <p class="muted sm">${real().length} pedido(s) reales en este navegador.</p>
+          <p class="muted sm">${real().length} pedido(s) reales guardados en el servidor.</p>
           <div class="row"><button class="btn-secondary sm" data-csv>Exportar CSV</button><button class="btn-secondary sm" data-reset>Borrar cambios de demo</button></div></div>
       </div>`;
     main.querySelector('[data-save]').onclick = () => { const o = {}; main.querySelectorAll('[data-k]').forEach(i => o[i.dataset.k] = i.value.trim()); setCfg(o); toast('Guardado'); };
@@ -2702,23 +2733,27 @@ footer.site-full{gap:32px}
 </script>
 <script>
 /* ===== Min — Catálogo: fotos reales de producto (panel del ERP) =====
-   5 tomas por modelo y por color: Frente, 3/4, Lateral 90°, Escenario, Close up.
-   5 modelos × 4 colores × 5 tomas = 100 fotos. Suben a Supabase Storage a través del backend,
-   protegidas por la sesión de administrador (cookie firmada por el servidor). El service_role
-   key nunca toca el navegador — solo vive en Vercel. */
+   Cada foto tiene su lugar:
+   · Portada  — el sofá grande del inicio, 1 por color (4).
+   · Tarjeta  — la foto de la tarjeta del catálogo y del carrito, 1 por modelo y color (20).
+   · Ficha    — 5 tomas por modelo y color: Frente, 3/4, Lateral 90°, Escenario, Close up (100).
+   Portada y Tarjeta necesitan fondo blanco: al subirlas se recorta solo el blanco sobrante y se
+   muestra una vista previa antes de guardar. Todo sube a Supabase Storage por el backend, con la
+   sesión de administrador (cookie firmada). El service_role key nunca toca el navegador. */
 (function () {
   const PRODUCTS = [
     ['sofa', 'Sofá 2.40'], ['sofa2', 'Sofá 2.00'], ['sillon', 'Sillón'], ['chaise', 'Chaise'], ['cama', 'Cama']
   ];
   const TONOS = ['Nube', 'Arena', 'Grafito', 'Olivo'];
   const TONO_C = ['#E4E1DB', '#C9B8A0', '#4E5054', '#6E6C3F'];
-  const SHOTS = [
+  const FICHA = [
     ['frente', 'Frente', 'De frente'],
     ['tres_cuartos', '3/4', 'Girado 45°'],
     ['lateral', 'Lateral 90°', 'De perfil'],
     ['escenario', 'Escenario', 'En ambiente'],
     ['closeup', 'Close up', 'Tela y costuras']
   ];
+  const BLANCO = { tarjeta: 1, portada: 1 };      // tomas que deben ir sobre fondo blanco
   let actual = 'sofa';
 
   const esc = s => String(s).replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
@@ -2726,31 +2761,76 @@ footer.site-full{gap:32px}
   const API_BASE = window.MIN_API_BASE || (location.protocol.startsWith('http') ? '' : 'https://min-casamins-projects.vercel.app');
   const api = (path, opts) => fetch(API_BASE + path, Object.assign({ credentials: 'include' }, opts));
 
-  // Foto que la tienda muestra hoy si todavía no subes una (solo existen Frente y Close up de origen).
-  function fotoBase(pid, ti, shot) {
+  // Foto que la tienda muestra hoy si todavía no subes una.
+  function fotoBase(pid, ti, kind) {
     if (typeof IMGS === 'undefined') return null;
-    if (shot === 'frente') return (IMGS[pid] || [])[ti] || null;
-    if (shot === 'closeup') return (IMGS[pid + '_det'] || [])[ti] || null;
+    if (kind === 'tarjeta' || kind === 'portada' || kind === 'frente') return (IMGS[pid] || [])[ti] || null;
+    if (kind === 'closeup') return (IMGS[pid + '_det'] || [])[ti] || null;
     return null;
   }
 
-  function comprimir(file, max, q) {
+  function leerImagen(file) {
     return new Promise((ok, bad) => {
       const fr = new FileReader();
       fr.onerror = bad;
-      fr.onload = () => {
-        const im = new Image();
-        im.onerror = () => bad(new Error('No se pudo leer la imagen'));
-        im.onload = () => {
-          const k = Math.min(1, max / Math.max(im.width, im.height));
-          const c = document.createElement('canvas');
-          c.width = Math.round(im.width * k); c.height = Math.round(im.height * k);
-          c.getContext('2d').drawImage(im, 0, 0, c.width, c.height);
-          ok(c.toDataURL('image/jpeg', q));
-        };
-        im.src = fr.result;
-      };
+      fr.onload = () => { const im = new Image(); im.onerror = () => bad(new Error('No se pudo leer la imagen')); im.onload = () => ok(im); im.src = fr.result; };
       fr.readAsDataURL(file);
+    });
+  }
+  // Reduce a máx. 1600 px. Para Portada/Tarjeta revisa si el fondo es blanco y recorta el blanco sobrante.
+  async function procesar(file, blanco) {
+    const im = await leerImagen(file);
+    const k = Math.min(1, 1600 / Math.max(im.width, im.height));
+    let c = document.createElement('canvas');
+    c.width = Math.round(im.width * k); c.height = Math.round(im.height * k);
+    const g = c.getContext('2d');
+    g.fillStyle = '#fff'; g.fillRect(0, 0, c.width, c.height);
+    g.drawImage(im, 0, 0, c.width, c.height);
+    let fondoBlanco = null;
+    if (blanco) {
+      const { width: w, height: h } = c, d = g.getImageData(0, 0, w, h).data;
+      const esBlanco = (x, y) => { const i = (y * w + x) * 4; return d[i] > 236 && d[i + 1] > 236 && d[i + 2] > 236; };
+      let borde = 0, blancos = 0;
+      for (let x = 0; x < w; x += 2) { borde += 2; blancos += esBlanco(x, 0) + esBlanco(x, h - 1); }
+      for (let y = 0; y < h; y += 2) { borde += 2; blancos += esBlanco(0, y) + esBlanco(w - 1, y); }
+      fondoBlanco = blancos / borde > 0.9;
+      if (fondoBlanco) {
+        let x0 = w, y0 = h, x1 = -1, y1 = -1;
+        for (let y = 0; y < h; y++) for (let x = 0; x < w; x++) if (!esBlanco(x, y)) { if (x < x0) x0 = x; if (x > x1) x1 = x; if (y < y0) y0 = y; if (y > y1) y1 = y; }
+        if (x1 > x0 && y1 > y0) {
+          const m = Math.round(Math.max(x1 - x0, y1 - y0) * 0.01);
+          x0 = Math.max(0, x0 - m); y0 = Math.max(0, y0 - m); x1 = Math.min(w - 1, x1 + m); y1 = Math.min(h - 1, y1 + m);
+          const c2 = document.createElement('canvas');
+          c2.width = x1 - x0 + 1; c2.height = y1 - y0 + 1;
+          c2.getContext('2d').drawImage(c, x0, y0, c2.width, c2.height, 0, 0, c2.width, c2.height);
+          c = c2;
+        }
+      }
+    }
+    return { dataUrl: c.toDataURL('image/jpeg', 0.86), fondoBlanco };
+  }
+
+  // Vista previa de cómo queda en la tarjeta / portada antes de guardar.
+  function vistaPrevia(kind, pid, dataUrl, fondoBlanco) {
+    return new Promise(done => {
+      const ov = document.createElement('div');
+      ov.className = 'cat-pv-ov';
+      const prod = (PRODUCTS.find(p => p[0] === pid) || [, ''])[1];
+      const muestra = kind === 'portada'
+        ? `<div class="cat-pv-hero"><img src="${dataUrl}" alt=""></div>`
+        : `<div class="card cat-pv-card"><div class="imgbox"><a><img class="p-${pid}" src="${dataUrl}" alt=""></a></div><div class="toprow"><h3>${esc(prod)}</h3></div></div>`;
+      ov.innerHTML = `<div class="cat-pv">
+        <h3>Así se verá en ${kind === 'portada' ? 'la portada' : 'la tarjeta del catálogo'}</h3>
+        ${fondoBlanco ? '<p class="muted sm">Recorté el blanco sobrante para que el mueble quede al mismo tamaño que los demás.</p>'
+          : '<p class="cat-pv-warn"><b>Esta foto no tiene fondo blanco.</b> En ' + (kind === 'portada' ? 'la portada' : 'la tarjeta') + ' se va a ver distinta a las demás. Lo ideal es el mueble sobre fondo blanco.</p>'}
+        ${muestra}
+        <div class="cat-pv-btns"><button class="btn-secondary" data-no>Cancelar</button><button class="btn-primary" data-si>Guardar foto</button></div>
+      </div>`;
+      document.body.appendChild(ov);
+      const fin = v => { ov.remove(); done(v); };
+      ov.querySelector('[data-no]').onclick = () => fin(false);
+      ov.querySelector('[data-si]').onclick = () => fin(true);
+      ov.addEventListener('click', e => { if (e.target === ov) fin(false); });
     });
   }
 
@@ -2766,27 +2846,21 @@ footer.site-full{gap:32px}
         ${errDetail ? `<p class="muted sm" style="font-family:monospace;font-size:11px;opacity:.8">Detalle técnico: ${esc(errDetail)}</p>` : ''}</div>`;
       return;
     }
-    if (!sess.admin) return loginGate(main, head, toast);
+    if (!sess.admin) { main.innerHTML = head('Catálogo · Fotos de producto', 'Tu sesión expiró. Vuelve a entrar al ERP.'); return; }
     await renderGrid(main, head, toast);
   }
 
-  function loginGate(main, head, toast) {
-    main.innerHTML = head('Catálogo · Fotos de producto', 'Confirma tu contraseña de administrador') + `
-      <div class="panel" style="max-width:360px">
-        <form id="cat-login">
-          <label style="display:flex;flex-direction:column;gap:6px;font-weight:700;font-size:13px;color:var(--mute2)">Contraseña
-            <input type="password" name="p" autofocus autocomplete="current-password" style="height:44px;border:1.5px solid var(--line2);border-radius:10px;padding:0 12px;font-size:15px">
-          </label>
-          <button class="btn-primary" style="margin-top:14px;width:100%;height:44px">Entrar</button>
-          <small class="err" style="color:#B3261E;display:block;margin-top:8px" hidden>Contraseña incorrecta</small>
-        </form>
-      </div>`;
-    main.querySelector('#cat-login').onsubmit = async e => {
-      e.preventDefault();
-      const r = await api('/api/admin/login', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ password: e.target.p.value }) });
-      if (r.ok) admin(main, head, toast);
-      else main.querySelector('.err').hidden = false;
-    };
+  function slot(byKey, pid, ti, kind, label, hint) {
+    const f = byKey[`${pid}-${ti}-${kind}`];
+    const base = f ? null : fotoBase(pid, ti, kind);
+    const src = f ? f.url : base;
+    const key = `${pid}|${ti}|${kind}`;
+    return `<div class="gl-slot ${f || base ? 'has' : ''}">
+      <label class="gl-drop ${BLANCO[kind] ? 'wb' : ''}">${src ? `<img src="${esc(src)}" alt="">` : vacio(label, hint)}
+        <input type="file" accept="image/*" data-up="${key}" hidden>
+        <span class="gl-over">${f || base ? 'Cambiar foto' : 'Subir foto'}</span></label>
+      <div class="gl-meta"><b>${label}</b>${f ? `<button class="gl-rm" data-rm="${key}">Quitar</button>` : `<small>${base ? 'Foto actual' : 'Vacío'}</small>`}</div>
+    </div>`;
   }
 
   async function renderGrid(main, head, toast) {
@@ -2794,38 +2868,39 @@ footer.site-full{gap:32px}
     try { fotos = await api('/api/admin/photos').then(r => r.json()); } catch (e) { /* noop */ }
     const byKey = {};
     (Array.isArray(fotos) ? fotos : []).forEach(f => byKey[`${f.product}-${f.tone}-${f.kind}`] = f);
-    const cuenta = pid => TONOS.reduce((n, _, ti) => n + SHOTS.filter(([k]) => byKey[`${pid}-${ti}-${k}`]).length, 0);
-    const porModelo = SHOTS.length * TONOS.length;
-    const total = PRODUCTS.reduce((n, [pid]) => n + cuenta(pid), 0), max = PRODUCTS.length * porModelo;
+    const kindsModelo = ['tarjeta'].concat(FICHA.map(s => s[0]));
+    const cuenta = pid => TONOS.reduce((n, _, ti) => n + kindsModelo.filter(k => byKey[`${pid}-${ti}-${k}`]).length, 0);
+    const porModelo = kindsModelo.length * TONOS.length;
+    const nPortada = TONOS.filter((_, ti) => byKey[`sofa-${ti}-portada`]).length;
+    const total = nPortada + PRODUCTS.reduce((n, [pid]) => n + cuenta(pid), 0), max = TONOS.length + PRODUCTS.length * porModelo;
     const plabel = PRODUCTS.find(([p]) => p === actual)[1];
 
     main.innerHTML = head('Catálogo · Fotos de producto', `${total} de ${max} fotos subidas · <a href="#/" target="_blank">Ver tienda ↗</a>`) + `
       <div class="panel gl-tips">
-        <p><b>5 fotos por color:</b> Frente, 3/4, Lateral 90°, Escenario y Close up — en ese orden aparecen en la ficha del producto. Toca un cuadro para subir o cambiar la foto; se comprime sola (máx. 1600 px).</p>
+        <p><b>Cada foto tiene su lugar.</b> <b>Portada</b>: el sofá grande del inicio. <b>Tarjeta</b>: la foto de cada mueble en el catálogo y el carrito. <b>Ficha</b>: las 5 fotos que se ven al abrir el producto, en este orden: Frente, 3/4, Lateral 90°, Escenario y Close up.</p>
+        <p>Portada y Tarjeta van con el <b>mueble sobre fondo blanco</b>: al subirlas se recorta solo el blanco sobrante y ves cómo queda antes de guardar.</p>
       </div>
+
+      <div class="panel">
+        <h3>Portada <small class="cat-cnt">${nPortada}/${TONOS.length}</small></h3>
+        <p class="muted sm" style="margin:4px 0 0">Sofá 2.40 en la portada del inicio. Cambia con los botones de color de la portada.</p>
+        <div class="cat-row cat-row4">${TONOS.map((tono, ti) => slot(byKey, 'sofa', ti, 'portada', tono, 'Fondo blanco')).join('')}</div>
+      </div>
+
       <div class="cat-tabs">${PRODUCTS.map(([pid, lbl]) => {
         const n = cuenta(pid);
         return `<button class="${pid === actual ? 'on' : ''}" data-prod="${pid}">${esc(lbl)} <small class="${n === porModelo ? 'ok' : ''}">${n}/${porModelo}</small></button>`;
       }).join('')}</div>
       <div class="panel">
         <h3>${esc(plabel)}</h3>
+        <div class="cat-cols"><span>Tarjeta</span><span>Ficha del producto · 5 fotos</span></div>
         ${TONOS.map((tono, ti) => {
-          const n = SHOTS.filter(([k]) => byKey[`${actual}-${ti}-${k}`]).length;
+          const n = kindsModelo.filter(k => byKey[`${actual}-${ti}-${k}`]).length;
           return `<div class="cat-tone">
-            <div class="cat-tone-h"><span class="cat-sw" style="background:${TONO_C[ti]}"></span><b>${tono}</b><small>${n}/${SHOTS.length}</small></div>
-            <div class="cat-row">
-              ${SHOTS.map(([k, klabel, hint]) => {
-                const f = byKey[`${actual}-${ti}-${k}`];
-                const base = f ? null : fotoBase(actual, ti, k);
-                const src = f ? f.url : base;
-                const key = `${actual}|${ti}|${k}`;
-                return `<div class="gl-slot ${f || base ? 'has' : ''}">
-                  <label class="gl-drop">${src ? `<img src="${esc(src)}" alt="">` : vacio(klabel, hint)}
-                    <input type="file" accept="image/*" data-up="${key}" hidden>
-                    <span class="gl-over">${f || base ? 'Cambiar foto' : 'Subir foto'}</span></label>
-                  <div class="gl-meta"><b>${klabel}</b>${f ? `<button class="gl-rm" data-rm="${key}">Quitar</button>` : `<small>${base ? 'Foto actual' : 'Vacío'}</small>`}</div>
-                </div>`;
-              }).join('')}
+            <div class="cat-tone-h"><span class="cat-sw" style="background:${TONO_C[ti]}"></span><b>${tono}</b><small>${n}/${kindsModelo.length}</small></div>
+            <div class="cat-row cat-row6">
+              ${slot(byKey, actual, ti, 'tarjeta', 'Tarjeta', 'Fondo blanco')}
+              ${FICHA.map(([k, klabel, hint]) => slot(byKey, actual, ti, k, klabel, hint)).join('')}
             </div>
           </div>`;
         }).join('')}
@@ -2836,9 +2911,10 @@ footer.site-full{gap:32px}
       const f = inp.files[0]; if (!f) return;
       if (!/^image\//.test(f.type)) return toast('Ese archivo no es una imagen');
       const [product, tone, kind] = inp.dataset.up.split('|');
-      const slot = inp.closest('.gl-slot'); slot.classList.add('busy');
+      const slotEl = inp.closest('.gl-slot'); slotEl.classList.add('busy');
       try {
-        const dataUrl = await comprimir(f, 1600, 0.82);
+        const { dataUrl, fondoBlanco } = await procesar(f, !!BLANCO[kind]);
+        if (BLANCO[kind] && !(await vistaPrevia(kind, product, dataUrl, fondoBlanco))) { slotEl.classList.remove('busy'); inp.value = ''; return; }
         const r = await api('/api/admin/photos', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ product, tone, kind, dataUrl }) });
         const j = await r.json().catch(() => ({}));
         if (!r.ok) throw new Error(j.error || 'Error al subir');
@@ -2858,7 +2934,7 @@ footer.site-full{gap:32px}
     }));
   }
 
-  window.MinCatalogo = { admin, SHOTS };
+  window.MinCatalogo = { admin };
 })();
 
 </script>
@@ -3040,7 +3116,7 @@ function renderHome(app, scrollTo) {
       </div>
     </div>
     <div class="herocard">
-      <img id="heroImg" src="${imgFor('sofa', 0)}" alt="Sofá Min" />
+      <img id="heroImg" src="${heroSrc(0)}" alt="Sofá Min" />
       <div class="hero-price"><div class="num">$9,800</div><div class="cap">Directo de la fábrica a tu casa</div></div>
       <div class="hero-tone">
         <span class="lbl" id="heroToneLbl">Tono: Nube</span>
@@ -3238,7 +3314,7 @@ function renderHome(app, scrollTo) {
     box.querySelectorAll('button').forEach(b => b.addEventListener('click', () => {
       heroTone = parseInt(b.dataset.j);
       app.querySelector('#heroToneLbl').textContent = 'Tono: ' + TONES[heroTone].n;
-      app.querySelector('#heroImg').src = imgFor('sofa', heroTone);
+      app.querySelector('#heroImg').src = heroSrc(heroTone);
       renderHeroSwatches();
     }));
   }
@@ -3396,7 +3472,7 @@ function renderProducto(app, id) {
   function slides() {
     const extra = p.fotos[state.tone] || [], up = p.up || {};
     const slots = SLOTS.map(([k, lbl], i) => up[k + state.tone] ? { src: up[k + state.tone], lbl } : extra[i] ? { src: extra[i].src, lbl: extra[i].lbl } : { src: placeholder(lbl), lbl });
-    return [{ src: p.imgs[state.tone], lbl: 'Frente' }].concat(slots, [{ src: p.det[state.tone], lbl: 'Close up' }], extra.slice(3).map(f => ({ src: f.src, lbl: f.lbl })));
+    return [{ src: up['frente' + state.tone] || p.imgs[state.tone], lbl: 'Frente' }].concat(slots, [{ src: p.det[state.tone], lbl: 'Close up' }], extra.slice(3).map(f => ({ src: f.src, lbl: f.lbl })));
   }
   function goSlide(i) {
     const n = slides().length;
@@ -3509,28 +3585,69 @@ function renderCarrito(app) {
     });
     MinFlete.bindFleteCart(body, draw);
     const checkoutBtn = body.querySelector('#checkoutBtn');
-    if (checkoutBtn) checkoutBtn.addEventListener('click', () => MinERP.openCheckout((o, ok) => {
-      if (!ok) { showToast('El pago no se completó. Tu carrito sigue aquí.'); return; }
-      body.innerHTML = `
-        <div class="confirm-box">
-          <div class="check"><svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6L9 17l-5-5"></path></svg></div>
-          <h2 style="margin:0 0 8px;font-weight:900;font-size:26px">¡Pago aprobado!</h2>
-          <p style="color:var(--mute2);margin:0 0 4px">Pedido ${o.id} · Total ${fmt(o.total)}</p>
-          <p style="color:var(--mute2);margin:0 0 4px">${o.flete.costo ? 'Flete: ' + MinFlete.FLETE[o.flete.tipo].name : 'Flete gratis'} · Fabricación 3 semanas</p>
-          <p style="color:var(--mute);font-size:13px;max-width:380px;margin:12px auto 0">Te mandamos la confirmación a ${o.customer.email}. Te avisamos por WhatsApp cuando tu mueble esté listo.</p>
-          <a href="#/" class="btn-primary" style="margin-top:24px;display:inline-flex">Seguir viendo el catálogo</a>
-        </div>`;
-      updateCartBadge();
-    }));
+    if (checkoutBtn) checkoutBtn.addEventListener('click', () => MinERP.openCheckout());
   }
   draw();
   updateCartBadge();
   window.scrollTo(0, 0);
 }
 
+const HERO = [null, null, null, null];           // portada subida desde el ERP (por color)
+function heroSrc(t) { return HERO[t] || imgFor('sofa', t); }
+/* ================= REGRESO DE MERCADO PAGO ================= */
+function renderGracias(app, params) {
+  const id = params.get('order') || '';
+  app.innerHTML = navHtml() + `<div class="cartpage"><div id="gxBody"><div class="confirm-box"><p style="color:var(--mute2);margin:0">Revisando tu pago…</p></div></div></div>` + footerHtml();
+  updateCartBadge(); window.scrollTo(0, 0);
+  const body = app.querySelector('#gxBody');
+  const check = ok => `<div class="check" style="${ok ? '' : 'background:#8A8F96'}"><svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="3" stroke-linecap="round" stroke-linejoin="round">${ok ? '<path d="M20 6L9 17l-5-5"></path>' : '<path d="M12 7v6M12 17h.01"></path>'}</svg></div>`;
+  let email = ''; try { const u = JSON.parse(sessionStorage.getItem('min_ultimo_pedido') || '{}'); if (u.id === id) email = u.email || ''; } catch (e) {}
+  let intentos = 0;
+  function pinta(o) {
+    if (o.pago === 'aprobado') {
+      saveCart([]); updateCartBadge();
+      body.innerHTML = `<div class="confirm-box">${check(true)}
+        <h2 style="margin:0 0 8px;font-weight:900;font-size:26px">¡Pago aprobado!</h2>
+        <p style="color:var(--mute2);margin:0 0 4px">Pedido ${o.id} · Total ${fmt(o.total)}</p>
+        <p style="color:var(--mute2);margin:0 0 4px">${o.flete && o.flete.costo ? 'Flete: ' + MinFlete.FLETE[o.flete.tipo].name : 'Flete gratis'} · Fabricación 3 semanas</p>
+        <p style="color:var(--mute);font-size:13px;max-width:380px;margin:12px auto 0">${email ? 'Te mandamos la confirmación a ' + email + '. ' : ''}Te avisamos por WhatsApp cuando tu mueble esté listo.</p>
+        <a href="#/" class="btn-primary" style="margin-top:24px;display:inline-flex">Seguir viendo el catálogo</a></div>`;
+    } else if (o.pago === 'pendiente' && pagoIniciado) {
+      saveCart([]); updateCartBadge();
+      body.innerHTML = `<div class="confirm-box">${check(false)}
+        <h2 style="margin:0 0 8px;font-weight:900;font-size:26px">Tu pago está en proceso</h2>
+        <p style="color:var(--mute2);margin:0 0 4px">Pedido ${o.id} · Total ${fmt(o.total)}</p>
+        <p style="color:var(--mute);font-size:13px;max-width:400px;margin:12px auto 0">Si pagaste en OXXO o por transferencia, se acredita en cuanto Mercado Pago lo confirme. Tu pedido entra a fabricación en ese momento y te avisamos.</p>
+        <a href="#/" class="btn-primary" style="margin-top:24px;display:inline-flex">Seguir viendo el catálogo</a></div>`;
+    } else {
+      body.innerHTML = `<div class="confirm-box">${check(false)}
+        <h2 style="margin:0 0 8px;font-weight:900;font-size:26px">El pago no se completó</h2>
+        <p style="color:var(--mute2);margin:0 0 4px">No se hizo ningún cargo. Tu carrito sigue aquí para intentarlo de nuevo.</p>
+        <a href="#/carrito" class="btn-primary" style="margin-top:24px;display:inline-flex">Volver al carrito</a></div>`;
+    }
+  }
+  const status = params.get('status') || params.get('collection_status') || '';
+  const pid = params.get('payment_id') || params.get('collection_id') || '';
+  const pagoIniciado = !!pid && pid !== 'null' && status !== 'rejected' && status !== 'null';
+  function consulta() {
+    fetch('/api/order-status?id=' + encodeURIComponent(id) + (pid && pid !== 'null' ? '&payment_id=' + encodeURIComponent(pid) : ''))
+      .then(r => r.ok ? r.json() : Promise.reject())
+      .then(o => {
+        if (o.pago !== 'aprobado' && status === 'approved' && intentos++ < 5) { setTimeout(consulta, 2500); return; }
+        pinta(o);
+      })
+      .catch(() => { body.innerHTML = `<div class="confirm-box"><p style="color:var(--mute2)">No pudimos revisar el pedido ${id} en este momento. Si ya pagaste, está registrado; te contactamos pronto.</p><a href="#/" class="btn-primary" style="margin-top:20px;display:inline-flex">Ir al inicio</a></div>`; });
+  }
+  consulta();
+}
+
 function imgFor(id, toneIdx) { const p = PRODUCTS[id]; if (!p) return ''; return p.imgs[toneIdx != null ? toneIdx : p.defaultTone]; }
 
 /* ================= ROUTER ================= */
+(function () {
+  const q = new URLSearchParams(location.search);
+  if (/^MIN-\d+$/.test(q.get('order') || '')) history.replaceState(null, '', location.pathname + '#/gracias?' + q.toString());
+})();
 function router() {
   const app = document.getElementById('app');
   const raw = location.hash.slice(1) || '/';
@@ -3542,34 +3659,38 @@ function router() {
   else if (path === '/legal') { MinLegal.render(app, params.get('doc'), navHtml(), footerHtml()); updateCartBadge(); }
   else if (path === '/fabrica') { MinGaleria.render(app, navHtml(), footerHtml()); updateCartBadge(); }
   else if (path === '/carrito') renderCarrito(app);
+  else if (path === '/gracias') renderGracias(app, params);
   else renderHome(app, params.get('scroll'));
 }
 window.addEventListener('hashchange', router);
-window.addEventListener('DOMContentLoaded', router);
 
-/* ===== Fotos reales subidas desde el ERP (Catálogo): Frente, 3/4, Lateral 90°, Escenario, Close up ===== */
+/* ===== Fotos reales subidas desde el ERP (Catálogo) — cada una en su lugar =====
+   portada → portada del inicio · tarjeta → tarjeta del catálogo y carrito
+   frente, tres_cuartos, lateral, escenario, closeup → las 5 fotos de la ficha */
+const FICHA_UP = ['frente', 'tres_cuartos', 'lateral', 'escenario', 'closeup'];
 function aplicarFotos(rows) {
-  const swap = {};
   rows.forEach(r => {
     const p = PRODUCTS[r.product], t = Number(r.tone);
     if (!p || !(t >= 0 && t <= 3) || !r.url) return;
-    if (r.kind === 'frente') { swap[p.imgs[t]] = r.url; p.imgs[t] = r.url; }
-    else if (r.kind === 'closeup') { p.det[t] = r.url; }
-    else if (['tres_cuartos', 'lateral', 'escenario'].includes(r.kind)) { (p.up = p.up || {})[r.kind + t] = r.url; }
+    if (r.kind === 'portada' && r.product === 'sofa') HERO[t] = r.url;
+    else if (r.kind === 'tarjeta') p.imgs[t] = r.url;
+    else if (r.kind === 'closeup') p.det[t] = r.url;
+    else if (FICHA_UP.includes(r.kind)) (p.up = p.up || {})[r.kind + t] = r.url;
   });
   Object.values(PRODUCTS).forEach(p => { p.img = p.imgs[p.defaultTone]; });
-  const path = (location.hash.slice(1) || '/').split('?')[0];
-  if (path === '/erp') return;
-  if (path === '/producto') { router(); return; }
-  document.querySelectorAll('#app img').forEach(im => { const n = swap[im.getAttribute('src')]; if (n) im.src = n; });
 }
-if (/^https?:$/.test(location.protocol)) {
-  fetch('/api/photos').then(r => r.ok ? r.json() : []).then(rows => {
-    if (!Array.isArray(rows) || !rows.length) return;
-    if (document.readyState === 'loading') window.addEventListener('DOMContentLoaded', () => aplicarFotos(rows));
-    else aplicarFotos(rows);
-  }).catch(() => {});
-}
+// La primera pantalla espera las fotos máx. 800 ms para no mostrar una foto y luego cambiarla.
+let primeraVista = false;
+const fotosListas = /^https?:$/.test(location.protocol)
+  ? fetch('/api/photos').then(r => r.ok ? r.json() : []).then(rows => {
+      if (!Array.isArray(rows) || !rows.length) return;
+      aplicarFotos(rows);
+      if (primeraVista && (location.hash.slice(1) || '/').split('?')[0] !== '/erp') router();
+    }).catch(() => {})
+  : Promise.resolve();
+window.addEventListener('DOMContentLoaded', () => {
+  Promise.race([fotosListas, new Promise(r => setTimeout(r, 800))]).then(() => { primeraVista = true; router(); });
+});
 </script>
 </body>
 </html>
