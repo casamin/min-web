@@ -3471,8 +3471,10 @@ function renderProducto(app, id) {
   }
   function slides() {
     const extra = p.fotos[state.tone] || [], up = p.up || {};
-    const slots = SLOTS.map(([k, lbl], i) => up[k + state.tone] ? { src: up[k + state.tone], lbl } : extra[i] ? { src: extra[i].src, lbl: extra[i].lbl } : { src: placeholder(lbl), lbl });
-    return [{ src: up['frente' + state.tone] || p.imgs[state.tone], lbl: 'Frente' }].concat(slots, [{ src: p.det[state.tone], lbl: 'Close up' }], extra.slice(3).map(f => ({ src: f.src, lbl: f.lbl })));
+    // full = la foto llena el cuadro (fotos con fondo y cuadros pendientes); el Frente recortado sobre blanco se muestra completo.
+    const slots = SLOTS.map(([k, lbl], i) => up[k + state.tone] ? { src: up[k + state.tone], lbl, full: true } : extra[i] ? { src: extra[i].src, lbl: extra[i].lbl, full: true } : { src: placeholder(lbl), lbl, full: true });
+    const frente = up['frente' + state.tone];
+    return [{ src: frente || p.imgs[state.tone], lbl: 'Frente', full: !!frente }].concat(slots, [{ src: p.det[state.tone], lbl: 'Close up', full: true }], extra.slice(3).map(f => ({ src: f.src, lbl: f.lbl, full: true })));
   }
   function goSlide(i) {
     const n = slides().length;
@@ -3483,10 +3485,11 @@ function renderProducto(app, id) {
     const S = slides(), cur = S[state.slide];
     const main = $('#mainImg');
     main.src = cur.src;
+    main.parentElement.classList.toggle('full', !!cur.full);
     main.alt = p.name + ' Min — ' + TONES[state.tone].n + ' — ' + cur.lbl;
     
     const thumbs = $('#galThumbs');
-    thumbs.innerHTML = S.map((s, i) => `<button class="gal-thumb ${i === state.slide ? 'sel' : ''}" data-i="${i}" aria-label="${s.lbl}" title="${s.lbl}"><img src="${s.src}" alt=""></button>`).join('');
+    thumbs.innerHTML = S.map((s, i) => `<button class="gal-thumb ${i === state.slide ? 'sel' : ''} ${s.full ? 'full' : ''}" data-i="${i}" aria-label="${s.lbl}" title="${s.lbl}"><img src="${s.src}" alt=""></button>`).join('');
     thumbs.querySelectorAll('button').forEach(b => b.addEventListener('click', () => goSlide(parseInt(b.dataset.i))));
     $('#galDots').innerHTML = S.map((_, i) => `<span class="${i === state.slide ? 'sel' : ''}"></span>`).join('');
   }
