@@ -1,6 +1,7 @@
 // POST /api/samples — guarda una solicitud de muestras de tela gratis (sin pago).
 // Pide la aceptación del Aviso de privacidad y guarda su evidencia, igual que el checkout.
-const { db, readBody, send, ZONAS } = require('./_lib');
+const { db, readBody, send, mail, ZONAS } = require('./_lib');
+const AVISOS = process.env.AVISOS_EMAIL || 'infominmx@gmail.com';    // a quién le llega el aviso de cada solicitud
 const PRIVACIDAD_VERSION = '2026-09-29';
 
 const CAMPOS = ['nombre', 'email', 'tel', 'calle', 'colonia', 'cp', 'zona'];
@@ -28,6 +29,9 @@ module.exports = async (req, res) => {
       ua: String(req.headers['user-agent'] || '').slice(0, 200)
     };
     await db('sample_requests', { method: 'POST', body: { customer, aceptacion }, prefer: 'return=minimal' });
+    await mail(AVISOS, `Nueva solicitud de muestras — ${customer.nombre}`,
+      `Alguien pidió muestras de tela.\n\n${customer.nombre}\nCorreo: ${customer.email}\nWhatsApp: ${customer.tel} (https://wa.me/52${customer.tel.replace(/\D/g, '').slice(-10)})\n\n` +
+      `${customer.calle}, ${customer.colonia}\nC.P. ${customer.cp} · ${customer.zona}${customer.refs ? '\nReferencias: ' + customer.refs : ''}\n\nMárcala como enviada en el ERP → Muestras.`).catch(() => false);
     send(res, 200, { ok: true });
   } catch (e) {
     console.error('samples error', e.message);
