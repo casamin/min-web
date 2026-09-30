@@ -8,7 +8,10 @@ module.exports = async (req, res) => {
   const { password } = await readBody(req);
   const real = process.env.ADMIN_PASSWORD;
   if (!real) return send(res, 500, { error: 'ADMIN_PASSWORD no configurada en Vercel' });
-  if (!password || !safeEqual(password, real)) return send(res, 401, { error: 'Contraseña incorrecta' });
+  if (!password || !safeEqual(password, real)) {
+    await new Promise(r => setTimeout(r, 1200));          // encarece adivinar la contraseña a golpes
+    return send(res, 401, { error: 'Contraseña incorrecta' });
+  }
   setSession(res, makeSession(), 12 * 3600);
   send(res, 200, { ok: true });
 };

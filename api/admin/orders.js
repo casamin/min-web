@@ -13,7 +13,7 @@ module.exports = async (req, res) => {
 
   if (req.method === 'PATCH') {
     const id = req.query?.id;
-    if (!id) return send(res, 400, { error: 'Falta id de pedido' });
+    if (!/^MIN-\d+$/.test(String(id || ''))) return send(res, 400, { error: 'Pedido inválido' });
     const body = await readBody(req);
     const allowed = ['estado', 'notas', 'envio', 'produccion'];
     const patch = {};

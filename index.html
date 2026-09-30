@@ -754,6 +754,17 @@ footer.site-full{gap:32px}
 .gl-meta small{color:var(--mute);font-weight:600}
 .gl-rm{font-weight:800;font-size:12px;color:#B3261E}
 
+
+/* ===== Aviso de privacidad / permiso de cookies ===== */
+.cn{position:fixed;left:16px;right:16px;bottom:16px;z-index:400;max-width:720px;margin:0 auto;background:#fff;border:1.5px solid var(--line2);border-radius:20px;box-shadow:0 18px 50px rgba(20,24,31,.22);padding:18px 20px;display:flex;flex-direction:column;gap:12px}
+body.erp-on .cn{display:none}
+.cn h4{margin:0;font-size:15px;font-weight:900}
+.cn p{margin:0;font-size:13.5px;line-height:1.5;color:var(--mute2);font-weight:600}
+.cn p a{color:var(--accent);font-weight:800;text-decoration:underline}
+.cn-b{display:flex;gap:10px;flex-wrap:wrap}
+.cn-b button{flex:1 1 180px;height:44px;border-radius:999px;font-weight:800;font-size:14px}
+.cn-b .cn-ok{background:var(--ink);color:#fff}
+.cn-b .cn-no{background:#fff;color:var(--ink);border:1.5px solid var(--ink)}
 /* ===== Checkout: aceptación legal ===== */
 .ck-legal{display:flex;flex-direction:column;gap:10px;margin-top:2px}
 .ck-f label.ck-chk{flex-direction:row;align-items:flex-start;gap:10px;font-size:13px;font-weight:600;color:#3A3C40;line-height:1.45}
@@ -2595,8 +2606,15 @@ footer.site-full{gap:32px}
       <h2>Cuánto tiempo los conservamos</h2>
       <p>Mientras dure la relación contigo y durante los plazos que exigen las leyes fiscales y mercantiles. Después, los eliminamos de forma segura.</p>
 
-      <h2>Tecnologías del sitio</h2>
-      <p>El sitio guarda tu carrito en el almacenamiento local de tu propio navegador para que no pierdas tu selección. Si en el futuro usamos herramientas de medición o publicidad, lo informaremos aquí.</p>
+      <h2>Cookies y almacenamiento en tu navegador</h2>
+      <p>Lo único que guardamos hoy es lo necesario para que la tienda funcione, y no sale de tu navegador:</p>
+      <ul>
+        <li><b>Tu carrito, tu forma de entrega elegida y tus preferencias</b> (almacenamiento local). Sirven para que no pierdas tu selección. Se borran cuando limpias los datos del sitio.</li>
+        <li><b>Tu último pedido</b> (almacenamiento de sesión), solo para mostrarte tu confirmación al volver de Mercado Pago. Se borra al cerrar la pestaña.</li>
+        <li><b>Una cookie de sesión</b> que solo existe cuando el equipo de ${L.marca} entra a su panel de administración. Tú no la recibes como cliente.</li>
+      </ul>
+      <p><b>Hoy no usamos cookies de publicidad, de seguimiento ni de análisis.</b> Si algún día usamos herramientas de medición o publicidad (por ejemplo, un pixel de redes sociales), solo se activarán si lo aceptas en el aviso que aparece al entrar al sitio, y actualizaremos esta sección. Puedes cambiar tu decisión cuando quieras en <a href="#/" data-consent>Preferencias de privacidad</a>, al final de la página.</p>
+      <p>Para mostrar el texto de la tienda usamos las fuentes de Google Fonts, por lo que tu navegador se conecta a los servidores de Google para descargarlas; Google puede recibir tu dirección IP. Mercado Pago, al que te enviamos para pagar, usa sus propias cookies bajo su propio aviso de privacidad.</p>
 
       <h2>Cambios a este aviso</h2>
       <p>Cualquier cambio se publicará en esta misma página, con su fecha de actualización.</p>
@@ -2632,6 +2650,7 @@ footer.site-full{gap:32px}
           ${link('terminos', 'Términos y condiciones')}
           ${link('privacidad', 'Aviso de privacidad')}
           ${link('entregas', 'Política de accesos')}
+          <a href="#/" data-consent>Preferencias de privacidad</a>
         </div>
         <div class="ft-col"><h4>Contacto</h4>
           <a href="mailto:${L.correo}">${L.correo}</a>
@@ -3697,7 +3716,7 @@ function renderGracias(app, params) {
         <h2 style="margin:0 0 8px;font-weight:900;font-size:26px">¡Pago aprobado!</h2>
         <p style="color:var(--mute2);margin:0 0 4px">Pedido ${o.id} · Total ${fmt(o.total)}</p>
         <p style="color:var(--mute2);margin:0 0 4px">${o.flete && o.flete.costo ? 'Flete: ' + MinFlete.FLETE[o.flete.tipo].name : 'Flete gratis'} · Fabricación 3 semanas</p>
-        <p style="color:var(--mute);font-size:13px;max-width:380px;margin:12px auto 0">${email ? 'Te mandamos la confirmación a ' + email + '. ' : ''}Te avisamos por WhatsApp cuando tu mueble esté listo.</p>
+        <p style="color:var(--mute);font-size:13px;max-width:380px;margin:12px auto 0">${email ? 'Te mandamos la confirmación a ' + email.replace(/[&<>"']/g, c => '&#' + c.charCodeAt(0) + ';') + '. ' : ''}Te avisamos por WhatsApp cuando tu mueble esté listo.</p>
         <a href="#/" class="btn-primary" style="margin-top:24px;display:inline-flex">Seguir viendo el catálogo</a></div>`;
     } else if (o.pago === 'pendiente' && pagoIniciado) {
       saveCart([]); updateCartBadge();
@@ -3778,6 +3797,40 @@ const fotosListas = /^https?:$/.test(location.protocol)
 window.addEventListener('DOMContentLoaded', () => {
   Promise.race([fotosListas, new Promise(r => setTimeout(r, 800))]).then(() => { primeraVista = true; router(); });
 });
+</script>
+<script>
+/* ===== Permiso de cookies y herramientas de medición =====
+   Hoy la tienda solo guarda lo necesario (carrito y preferencias) y NO usa cookies de seguimiento.
+   Este módulo guarda la decisión de la persona y es la única puerta para cargar herramientas opcionales:
+   cualquier pixel o analítica futura debe cargarse dentro de MinConsent.onGrant(() => { ... }) para que
+   solo se active si la persona aceptó. Nada opcional debe cargarse antes. */
+(function () {
+  const KEY = 'min_consent_v1';
+  const read = () => { try { const v = JSON.parse(localStorage.getItem(KEY) || 'null'); return v && (v.medicion === true || v.medicion === false) ? v : null; } catch (e) { return null; } };
+  const write = m => { try { localStorage.setItem(KEY, JSON.stringify({ medicion: m, at: Date.now(), v: '2026-09-30' })); } catch (e) {} };
+  const waiting = [];
+  function grant() { waiting.splice(0).forEach(f => { try { f(); } catch (e) { console.error(e); } }); }
+  function close() { const n = document.querySelector('.cn'); if (n) n.remove(); }
+  function open() {
+    close();
+    const n = document.createElement('div');
+    n.className = 'cn'; n.setAttribute('role', 'dialog'); n.setAttribute('aria-label', 'Privacidad');
+    n.innerHTML = `<h4>Tu privacidad</h4>
+      <p>Guardamos en tu navegador lo necesario para que la tienda funcione (tu carrito y tus preferencias). Con tu permiso, también podremos usar herramientas de medición y publicidad para mejorar el sitio; hoy no tenemos ninguna activa. Puedes cambiar tu decisión cuando quieras. Más en el <a href="#/legal?doc=privacidad">Aviso de privacidad</a>.</p>
+      <div class="cn-b"><button class="cn-no" data-r="0">Solo lo necesario</button><button class="cn-ok" data-r="1">Aceptar medición y publicidad</button></div>`;
+    document.body.appendChild(n);
+    n.querySelector('[data-r="0"]').onclick = () => { write(false); close(); };
+    n.querySelector('[data-r="1"]').onclick = () => { write(true); close(); grant(); };
+  }
+  window.MinConsent = {
+    can: () => { const c = read(); return !!(c && c.medicion); },
+    onGrant: f => { if (window.MinConsent.can()) f(); else waiting.push(f); },
+    open
+  };
+  document.addEventListener('click', e => { const a = e.target.closest && e.target.closest('[data-consent]'); if (a) { e.preventDefault(); open(); } });
+  const start = () => { if (!read()) open(); };
+  if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', start); else start();
+})();
 </script>
 </body>
 </html>

@@ -28,6 +28,16 @@ module.exports = async (req, res) => {
       ip: (req.headers['x-forwarded-for'] || '').split(',')[0].trim() || null,
       ua: String(req.headers['user-agent'] || '').slice(0, 200)
     };
+    // Anti-abuso: el formulario es público y manda correo. Una solicitud por correo cada 24 h, y tope global por hora.
+    // Si el chequeo falla (base caída, filtro inválido) la solicitud pasa: nunca bloqueamos a un cliente real por esto.
+    try {
+      const hace24h = new Date(Date.now() - 24 * 3600e3).toISOString();
+      const dup = await db(`sample_requests?select=id&customer-%3E%3Eemail=eq.${encodeURIComponent(customer.email.toLowerCase())}&created_at=gte.${hace24h}&limit=1`);
+      if (Array.isArray(dup) && dup.length) return send(res, 200, { ok: true });        // misma respuesta: no revela nada
+      const reciente = await db(`sample_requests?select=id&created_at=gte.${new Date(Date.now() - 3600e3).toISOString()}&limit=31`);
+      if (Array.isArray(reciente) && reciente.length > 30) return send(res, 429, { error: 'Estamos recibiendo muchas solicitudes. Intenta de nuevo en un rato o escríbenos por WhatsApp.' });
+    } catch (e) { console.error('samples antiabuso', e.message); }
+    customer.email = customer.email.toLowerCase();
     await db('sample_requests', { method: 'POST', body: { customer, aceptacion }, prefer: 'return=minimal' });
     await mail(AVISOS, `Nueva solicitud de muestras — ${customer.nombre}`,
       `Alguien pidió muestras de tela.\n\n${customer.nombre}\nCorreo: ${customer.email}\nWhatsApp: ${customer.tel} (https://wa.me/52${customer.tel.replace(/\D/g, '').slice(-10)})\n\n` +
