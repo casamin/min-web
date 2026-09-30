@@ -1649,7 +1649,7 @@ footer.site-full{gap:32px}
     get(k, d) { try { const v = localStorage.getItem(k); return v ? JSON.parse(v) : d; } catch (e) { return d; } },
     set(k, v) { try { localStorage.setItem(k, JSON.stringify(v)); } catch (e) {} }
   };
-  const cfg = () => Object.assign({ taller: 'taller@casamin.mx', avisos: 'infominmx@gmail.com', demo: false }, ls.get(CFG, {}));
+  const cfg = () => Object.assign({ taller: 'taller@casamin.mx', avisos: 'info@min.com.mx', demo: false }, ls.get(CFG, {}));
   const setCfg = c => ls.set(CFG, Object.assign(cfg(), c));
 
   const ESTADOS = {

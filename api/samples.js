@@ -1,7 +1,7 @@
 // POST /api/samples — guarda una solicitud de muestras de tela gratis (sin pago).
 // Pide la aceptación del Aviso de privacidad y guarda su evidencia, igual que el checkout.
 const { db, readBody, send, mail, ZONAS } = require('./_lib');
-const AVISOS = process.env.AVISOS_EMAIL || 'infominmx@gmail.com';    // a quién le llega el aviso de cada solicitud
+const AVISOS = process.env.AVISOS_EMAIL || 'info@min.com.mx';    // a quién le llega el aviso de cada solicitud
 const PRIVACIDAD_VERSION = '2026-09-29';
 
 const CAMPOS = ['nombre', 'email', 'tel', 'calle', 'colonia', 'cp', 'zona'];
