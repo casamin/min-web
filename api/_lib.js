@@ -102,22 +102,30 @@ function parseCookies(req) {
   return Object.fromEntries((req.headers.cookie || '').split(';').map(s => s.trim().split('=')).filter(p => p[0]).map(([k, ...v]) => [k, decodeURIComponent(v.join('='))]));
 }
 function setSession(res, value, maxAge) {
-  // SameSite=None porque, mientras el ERP siga siendo un HTML suelto (no servido desde este mismo
-  // dominio), el navegador llama a esta API desde otro origen — con Secure siempre (Vercel es HTTPS).
-  // El día que el sitio se sirva desde este mismo dominio, esto puede volver a Strict.
-  res.setHeader('Set-Cookie', `${COOKIE}=${value}; Path=/; HttpOnly; SameSite=None; Secure; Max-Age=${maxAge}`);
+  // El ERP vive en el mismo dominio que la API, así que la cookie nunca necesita viajar entre sitios:
+  // Strict evita que otra página haga peticiones con la sesión del administrador (CSRF).
+  res.setHeader('Set-Cookie', `${COOKIE}=${value}; Path=/; HttpOnly; SameSite=Strict; Secure; Max-Age=${maxAge}`);
 }
 
-/* ---------- CORS: la API se llama desde el HTML suelto (otro origen) mientras no comparten dominio ---------- */
+/* ---------- CORS: solo el propio sitio ----------
+   Antes reflejaba cualquier Origin con credenciales, lo que dejaba a cualquier página leer la API del ERP
+   con la sesión del administrador. Ahora solo se acepta el mismo host, SITE_URL y ALLOWED_ORIGINS (coma). */
+function originAllowed(req, origin) {
+  let host; try { host = new URL(origin).host; } catch (e) { return false; }
+  const own = String(req.headers['x-forwarded-host'] || req.headers.host || '').split(',')[0].trim();
+  if (host === own) return true;
+  const extra = [process.env.SITE_URL].concat(String(process.env.ALLOWED_ORIGINS || '').split(',')).map(x => (x || '').trim().replace(/\/$/, '')).filter(Boolean);
+  return extra.includes(origin);
+}
 function cors(req, res) {
   const origin = req.headers.origin;
-  if (origin) {
+  if (origin && originAllowed(req, origin)) {
     res.setHeader('Access-Control-Allow-Origin', origin);
     res.setHeader('Access-Control-Allow-Credentials', 'true');
     res.setHeader('Vary', 'Origin');
+    res.setHeader('Access-Control-Allow-Methods', 'GET,POST,PATCH,DELETE,OPTIONS');
+    res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
   }
-  res.setHeader('Access-Control-Allow-Methods', 'GET,POST,PATCH,DELETE,OPTIONS');
-  res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
   if (req.method === 'OPTIONS') { res.statusCode = 204; res.end(); return true; }
   return false;
 }
