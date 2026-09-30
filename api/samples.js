@@ -2,7 +2,7 @@
 // Pide la aceptación del Aviso de privacidad y guarda su evidencia, igual que el checkout.
 const { db, readBody, send, mail, ZONAS } = require('./_lib');
 const AVISOS = process.env.AVISOS_EMAIL || 'info@min.com.mx';    // a quién le llega el aviso de cada solicitud
-const PRIVACIDAD_VERSION = '2026-09-29';
+const PRIVACIDAD_VERSION = '2026-09-30';
 
 const CAMPOS = ['nombre', 'email', 'tel', 'calle', 'colonia', 'cp', 'zona'];
 const clip = (v, n) => String(v == null ? '' : v).trim().slice(0, n);
