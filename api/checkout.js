@@ -1,7 +1,7 @@
 // POST /api/checkout — crea la orden (pago pendiente) y la preferencia de Mercado Pago.
 // Nunca confía en precios del cliente: cotizar() recalcula todo server-side desde CATALOGO.
 const { cotizar, db, nextFolio, iso, readBody, send, baseUrl, resumenTxt, ZONAS } = require('./_lib');
-const LEGAL_VERSION = '2026-09-26';
+const LEGAL_VERSION = '2026-09-30';
 
 const CAMPOS = ['nombre', 'email', 'tel', 'calle', 'colonia', 'cp', 'zona', 'acceso'];
 const clip = (v, n) => String(v == null ? '' : v).trim().slice(0, n);
