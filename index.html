@@ -442,9 +442,6 @@ section.fit{padding:64px 40px;background:#fff}
 .fc-bar-t{display:flex;align-items:center;gap:8px;font-size:14px}
 .fc-bar-t svg{width:20px;height:20px;color:var(--accent);flex-shrink:0}
 .fc-bar.ok .fc-bar-t svg{color:#4F6B2E}
-.fc-track{height:8px;border-radius:99px;background:var(--line)}
-.fc-track i{display:block;height:100%;border-radius:99px;background:var(--accent);transition:width .3s}
-.fc-bar.ok .fc-track i{background:#4F6B2E}
 .fc-bar small{font-size:12px;color:var(--mute)}
 .fc-opt{display:flex;align-items:center;gap:12px;background:#fff;border:2px solid transparent;border-radius:16px;padding:14px 16px;cursor:pointer}
 .fc-opt.sel{border-color:var(--ink)}
@@ -1597,8 +1594,6 @@ footer.site-full{gap:32px}
   /* ---------- Bloque del carrito ---------- */
   function fleteCartHTML() {
     const pz = cartPiezas(), gratis = pz >= PIEZAS_GRATIS, sel = fleteActual();
-    const faltan = Math.max(0, PIEZAS_GRATIS - pz);
-    const pct = Math.min(100, Math.round(pz / PIEZAS_GRATIS * 100));
     const opt = (k, desc) => `
       <label class="fc-opt ${sel === k ? 'sel' : ''} ${gratis ? 'off' : ''}">
         <input type="radio" name="flete" value="${k}" ${sel === k ? 'checked' : ''} ${gratis ? 'disabled' : ''}>
@@ -1609,13 +1604,7 @@ footer.site-full{gap:32px}
     return `
       <div class="fc">
         <div class="fc-h"><h3>¿Cómo te lo llevamos?</h3><span>Fabricación: 3 semanas</span></div>
-        <div class="fc-bar ${gratis ? 'ok' : ''}">
-          <div class="fc-bar-t">${gratis
-            ? `${I.gift}<b>¡Flete gratis!</b> Llevas ${pz} piezas.`
-            : `${I.gift}Te ${faltan === 1 ? 'falta' : 'faltan'} <b>${faltan} ${faltan === 1 ? 'pieza' : 'piezas'}</b> para flete gratis`}</div>
-          <div class="fc-track"><i style="width:${pct}%"></i></div>
-          <small>El chaise cuenta como 2 piezas.</small>
-        </div>
+        ${gratis ? `<div class="fc-bar ok"><div class="fc-bar-t">${I.gift}<span><b>Tu flete es gratis.</b> Tu pedido lleva ${pz} piezas.</span></div></div>` : ''}
         ${opt('ruta', 'Juntamos pedidos de tu zona · máx. 7 días después de fabricado')}
         ${opt('ya', 'Camioneta solo para ti · el día que elijas')}
         <div class="fc-inc">${I.check}Incluye subida por elevador y armado. Sin gastos ocultos.</div>
